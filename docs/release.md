@@ -92,9 +92,10 @@ The tag push starts `.github/workflows/release.yml`, which:
 4. `release` downloads the three artifacts, checks every expected file, writes `checksums.txt`,
    creates a **draft** release, uploads the assets, then publishes it;
 5. `cnb` (optional) mirrors the published assets to cnb.cool. It is skipped when the repository
-   variable `CNB_REPO` is unset, and a failure there cannot fail the release. The `latest` alias
-   is updated only when GitHub reports the tag as the latest stable release, so re-running an old
-   release does not move the stable download channel backwards.
+   variable `CNB_REPO` is unset, and a failure there cannot fail the release. Only stable releases
+   are mirrored; tags containing a hyphen (release candidates and snapshot builds) are skipped.
+   The `latest` alias is updated only when GitHub reports the tag as the latest stable release, so
+   re-running an old release does not move the stable download channel backwards.
 
 The `cnb` job is a download mirror, not a second build: it uploads the same bytes, so the
 manifests and `checksums.txt` verify either location. Setup, the stable URL and the failure modes
