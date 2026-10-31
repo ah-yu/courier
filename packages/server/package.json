@@ -1,6 +1,6 @@
 {
   "name": "@courier/server",
-  "version": "0.0.0-dev.20261031.196fa6c",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
