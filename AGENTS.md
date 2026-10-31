@@ -108,7 +108,7 @@ bun --bun vitest run packages/e2e/src/sync.e2e.test.ts  # one file
 
 # Lint, format, types
 bun run lint
-bun run format
+bun run format               # whole checkout; ignores: .gitignore + `.oxfmtrc.json`
 bun run format:check
 bun run typecheck            # tsc --noEmit in every package + the tooling scripts
 
