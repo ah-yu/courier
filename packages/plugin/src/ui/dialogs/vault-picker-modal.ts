@@ -91,12 +91,18 @@ export class VaultPickerModal extends PromiseModal<boolean> {
     this.addAction(footer, t("dialog.vaultPicker.create"), () => void this.create(), {
       cta: true,
     });
-    footer.settingEl.style.cssText =
-      "display: flex; flex-direction: column; align-items: center; border: none; padding: 6px 0 0; margin: 0;";
+    footer.settingEl.setCssStyles({
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      border: "none",
+      padding: "6px 0 0",
+      margin: "0",
+    });
     // The phone layout gives the control the row's full width and pushes its content to
     // the right; the dialog's one entry point sits in the middle on every platform.
     const control = footer.settingEl.querySelector<HTMLElement>(".setting-item-control");
-    if (control) control.style.cssText = "justify-content: center;";
+    if (control) control.setCssStyles({ justifyContent: "center" });
 
     void this.load();
   }
@@ -118,7 +124,7 @@ export class VaultPickerModal extends PromiseModal<boolean> {
     setting.addButton((button) => {
       button.setButtonText(label).onClick(onClick);
       if (options.cta) button.setCta();
-      button.buttonEl.style.cssText = "flex: 0 0 auto; width: auto;";
+      button.buttonEl.setCssStyles({ flex: "0 0 auto", width: "auto" });
     });
   }
 
@@ -146,7 +152,7 @@ export class VaultPickerModal extends PromiseModal<boolean> {
 
     if (this.actionError) {
       const error = this.listEl.createDiv({ cls: "courier-settings-error" });
-      error.style.cssText = "color: var(--text-error); margin-bottom: 8px;";
+      error.setCssStyles({ color: "var(--text-error)", marginBottom: "8px" });
       error.setText(`⚠ ${this.actionError}`);
     }
 
@@ -159,7 +165,7 @@ export class VaultPickerModal extends PromiseModal<boolean> {
         text: `⚠ ${this.listError}`,
         cls: "courier-settings-error",
       });
-      error.style.cssText = "color: var(--text-error);";
+      error.setCssStyles({ color: "var(--text-error)" });
       new Setting(this.listEl).addButton((button) =>
         button.setButtonText(t("common.retry")).onClick(() => void this.load()),
       );
@@ -197,20 +203,38 @@ export class VaultPickerModal extends PromiseModal<boolean> {
       // the row and stretch its control across the whole width. The row itself never
       // wraps (the buttons stay beside the name); when the line is too narrow for the
       // name and its age, the *age* drops to a second line inside the row's own text.
-      row.settingEl.style.cssText =
-        "display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; " +
-        "justify-content: space-between; gap: 8px; border: none; padding: 3px 0; margin: 0;";
+      row.settingEl.setCssStyles({
+        display: "flex",
+        flexDirection: "row",
+        flexWrap: "nowrap",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: "8px",
+        border: "none",
+        padding: "3px 0",
+        margin: "0",
+      });
       const info = row.settingEl.querySelector<HTMLElement>(".setting-item-info");
       if (info) {
-        info.style.cssText =
-          "display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; " +
-          "flex: 1 1 auto; min-width: 0;";
+        info.setCssStyles({
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "baseline",
+          gap: "4px 8px",
+          flex: "1 1 auto",
+          minWidth: "0",
+        });
       }
       const control = row.settingEl.querySelector<HTMLElement>(".setting-item-control");
       if (control) {
         // `width` as well as `flex`: the phone layout gives a row's control the whole row
         // width, which wins over a flex shorthand alone.
-        control.style.cssText = "flex: 0 0 auto; width: auto; justify-content: flex-end; gap: 8px;";
+        control.setCssStyles({
+          flex: "0 0 auto",
+          width: "auto",
+          justifyContent: "flex-end",
+          gap: "8px",
+        });
       }
     }
   }

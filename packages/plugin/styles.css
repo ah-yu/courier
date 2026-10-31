@@ -286,11 +286,16 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  /* The solid colour is the fallback for a WebView without `color-mix`; the tinted line
-   * wins wherever it is supported. */
+  /* The solid colour is the fallback for a WebView without `color-mix`; the override below
+   * applies where it is supported. */
   background: var(--background-secondary);
-  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
   color: var(--interactive-accent);
+}
+
+@supports (background: color-mix(in srgb, red 10%, transparent)) {
+  .courier-reload-notice-icon {
+    background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  }
 }
 
 .courier-reload-notice-icon svg {
@@ -372,16 +377,21 @@ body.is-tablet .courier-reload-notice-actions button {
     bottom: calc(var(--mobile-toolbar-height, 0px) + var(--courier-safe-bottom) + 8px);
     left: 12px;
     width: auto;
-    /* `100vh` is the fallback for a WebView without `dvh`; the second line wins where
-     * it is supported. */
+    /* `100vh` is the fallback for a WebView without `dvh`; the `@supports` block below
+     * applies where `dvh` is supported. */
     max-height: calc(100vh - var(--mobile-toolbar-height, 0px) - var(--courier-safe-bottom) - 24px);
-    max-height: calc(
-      100dvh - var(--mobile-toolbar-height, 0px) - var(--courier-safe-bottom) - 24px
-    );
     padding: 16px;
     border-radius: 16px;
     overflow-y: auto;
     animation: courier-reload-notice-sheet-in 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  @supports (height: 100dvh) {
+    .courier-reload-notice {
+      max-height: calc(
+        100dvh - var(--mobile-toolbar-height, 0px) - var(--courier-safe-bottom) - 24px
+      );
+    }
   }
 
   .courier-reload-notice-icon {
@@ -428,12 +438,21 @@ body.is-phone .courier-reload-notice {
   bottom: calc(var(--mobile-toolbar-height, 0px) + var(--courier-safe-bottom) + 8px);
   left: 12px;
   width: auto;
+  /* `100vh` is the fallback for a WebView without `dvh`; the `@supports` block below
+   * applies where `dvh` is supported. */
   max-height: calc(100vh - var(--mobile-toolbar-height, 0px) - var(--courier-safe-bottom) - 24px);
-  max-height: calc(100dvh - var(--mobile-toolbar-height, 0px) - var(--courier-safe-bottom) - 24px);
   padding: 16px;
   border-radius: 16px;
   overflow-y: auto;
   animation: courier-reload-notice-sheet-in 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@supports (height: 100dvh) {
+  body.is-phone .courier-reload-notice {
+    max-height: calc(
+      100dvh - var(--mobile-toolbar-height, 0px) - var(--courier-safe-bottom) - 24px
+    );
+  }
 }
 
 body.is-phone .courier-reload-notice-icon {
@@ -957,8 +976,7 @@ body.is-phone .courier-conflict-diff-title {
   flex: 1 1 100%;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto auto;
-  column-gap: 10px;
-  row-gap: 1px;
+  gap: 1px 10px;
   align-items: center;
 }
 
@@ -970,9 +988,16 @@ body.is-phone .courier-conflict-diff-icon {
   width: 36px;
   height: 36px;
   border-radius: 10px;
+  /* The solid colour is the fallback for a WebView without `color-mix`; the override below
+   * applies where it is supported. */
   background: var(--background-secondary);
-  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
   color: var(--interactive-accent);
+}
+
+@supports (background: color-mix(in srgb, red 10%, transparent)) {
+  body.is-phone .courier-conflict-diff-icon {
+    background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  }
 }
 
 body.is-phone .courier-conflict-diff-icon svg {
@@ -2792,7 +2817,7 @@ body.is-phone .courier-conflict-replace-actions button {
 .courier-restore-name.setting-item {
   display: block;
   padding: 0;
-  border-top: none !important;
+  border-top: none;
 }
 
 .courier-restore-name .setting-item-info {

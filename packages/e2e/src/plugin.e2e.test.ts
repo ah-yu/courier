@@ -5549,8 +5549,8 @@ describe("plugin e2e — the real plugin against a real server", () => {
 
       // Narrow and centred inside the pane.
       const card = elementsWithClass(tab.containerEl, "courier-login")[0]!;
-      expect(card.style.cssText).toContain("max-width: 360px");
-      expect(card.style.cssText).toContain("margin: 48px auto 0");
+      expect(card.style.maxWidth).toBe("360px");
+      expect(card.style.margin).toBe("48px auto 0");
     });
 
     it("reports a rejected user key in place and stays on the first step", async () => {
@@ -5614,12 +5614,12 @@ describe("plugin e2e — the real plugin against a real server", () => {
       expect(row.desc).toMatch(/^创建于 /);
       // Both of the dialog's buttons keep their content width: Obsidian's phone layout
       // otherwise stretches every control in a settings row across the whole row.
-      expect(row.buttons[0]!.buttonEl.style.cssText).toContain("flex: 0 0 auto");
+      expect(row.buttons[0]!.buttonEl.style.flex).toBe("0 0 auto");
       const createButton = buttonsIn(picker.contentEl).find(
         (button) => button.text === "创建远程库",
       )!;
       expect(createButton, "no 创建 Vault button").toBeDefined();
-      expect(createButton.buttonEl.style.cssText).toContain("flex: 0 0 auto");
+      expect(createButton.buttonEl.style.flex).toBe("0 0 auto");
     });
 
     it("names the account from the server when nothing was stored on this device", async () => {

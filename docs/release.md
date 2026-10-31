@@ -96,9 +96,11 @@ The tag push starts `.github/workflows/release.yml`, which:
 2. `verify` runs the same `bun run verify` and `bun run verify format` gates as CI;
 3. `server`, `cli` and `plugin` build in parallel;
 4. `release` downloads the three artifacts, checks every expected file, writes `checksums.txt`,
-   creates a **draft** release, uploads the assets, then publishes it. It also publishes the
-   Obsidian version-tagged release (`X.Y.Z`, no leading `v`) with `main.js`, `manifest.json` and
-   `styles.css`, kept out of `releases/latest`; prereleases are skipped;
+   attests every asset with `actions/attest-build-provenance` (SLSA provenance, which the community
+   directory recommends and anyone can verify with `gh attestation verify`), creates a **draft**
+   release, uploads the assets, then publishes it. It also publishes the Obsidian version-tagged
+   release (`X.Y.Z`, no leading `v`) with `main.js`, `manifest.json` and `styles.css`, kept out of
+   `releases/latest`; prereleases are skipped;
 5. `cnb` (optional) mirrors the published assets to cnb.cool. It is skipped when the repository
    variable `CNB_REPO` is unset, and a failure there cannot fail the release. Only stable releases
    are mirrored; tags containing a hyphen (release candidates and snapshot builds) are skipped.
@@ -135,7 +137,8 @@ The plugin is published from this repository, so the directory's rules are relea
   plugin manifest.
 - **Manifest fields the directory reviews** (`scripts/check-release.ts` pins the mechanical ones):
   `id` is lowercase letters/digits/hyphens, unique across the directory, and neither ends with
-  `plugin` nor contains `obsidian`; `description` is at most 250 characters and ends with a period;
+  `plugin` nor contains `obsidian`; `description` is at most 250 characters, ends with a period and
+  must not contain the word "Obsidian" (the directory rejects it as redundant);
   `minAppVersion` is the real minimum; `fundingUrl` exists only if the project accepts donations;
   `isDesktopOnly` is `false` only when no Node.js or Electron API is used.
 - **The README carries the policy disclosures**: that an account on a self-hosted server is required

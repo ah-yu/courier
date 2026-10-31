@@ -27,9 +27,10 @@ export function storageUsageTitle(
     const bar = row.createDiv({ cls: "courier-storage-usage-bar" });
     bar.setAttribute("aria-hidden", "true");
     const fill = bar.createDiv({ cls: "courier-storage-usage-fill" });
-    fill.style.width = `${usage.percent}%`;
+    const fillStyles: Partial<CSSStyleDeclaration> = { width: `${usage.percent}%` };
     // A tiny but non-zero usage would otherwise round to an invisible bar.
-    if (usage.percent > 0) fill.style.minWidth = "2px";
+    if (usage.percent > 0) fillStyles.minWidth = "2px";
+    fill.setCssStyles(fillStyles);
   }
   row.createSpan({ cls: "courier-storage-usage-value", text: usage.text });
   return fragment;

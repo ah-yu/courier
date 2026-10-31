@@ -202,7 +202,7 @@ export class CourierSettingTab extends PluginSettingTab {
   private renderStageError(containerEl: HTMLElement): void {
     if (!this.stageError) return;
     const error = containerEl.createDiv({ cls: "courier-settings-error" });
-    error.style.cssText = "color: var(--text-error); margin: 4px 0;";
+    error.setCssStyles({ color: "var(--text-error)", margin: "4px 0" });
     error.setText(`⚠ ${this.stageError}`);
   }
 
@@ -226,7 +226,7 @@ export class CourierSettingTab extends PluginSettingTab {
     const card = containerEl.createDiv({ cls: "courier-login" });
     // A narrow column in the middle of the pane, with nothing above it: the page has
     // no title, so the form is the whole step.
-    card.style.cssText = "max-width: 360px; margin: 48px auto 0;";
+    card.setCssStyles({ maxWidth: "360px", margin: "48px auto 0" });
 
     const serverInput = this.renderLoginField(card, t("settings.login.serverAddress"), {
       type: "text",
@@ -253,7 +253,7 @@ export class CourierSettingTab extends PluginSettingTab {
     });
     submit.type = "button";
     submit.addClass("mod-cta");
-    submit.style.cssText = "width: 100%; margin-top: 8px; padding: 10px;";
+    submit.setCssStyles({ width: "100%", marginTop: "8px", padding: "10px" });
     const signIn = async () => {
       submit.disabled = true;
       submit.setText(t("settings.login.submitting"));
@@ -281,19 +281,28 @@ export class CourierSettingTab extends PluginSettingTab {
     },
   ): HTMLInputElement {
     const field = parent.createDiv({ cls: "courier-login-field" });
-    field.style.cssText = "margin-bottom: 14px;";
+    field.setCssStyles({ marginBottom: "14px" });
     const labelEl = field.createEl("label", { text: label, cls: "courier-login-label" });
-    labelEl.style.cssText =
-      "display: block; margin-bottom: 6px; font-weight: 600; font-size: var(--font-ui-small);";
+    labelEl.setCssStyles({
+      display: "block",
+      marginBottom: "6px",
+      fontWeight: "600",
+      fontSize: "var(--font-ui-small)",
+    });
 
     const input = field.createEl("input", { cls: "courier-login-input" });
     input.type = options.type;
     input.placeholder = options.placeholder;
     input.value = options.value;
-    input.style.cssText =
-      "box-sizing: border-box; width: 100%; padding: 8px 10px; " +
-      "border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); " +
-      "background: var(--background-modifier-form-field); color: var(--text-normal);";
+    input.setCssStyles({
+      boxSizing: "border-box",
+      width: "100%",
+      padding: "8px 10px",
+      border: "1px solid var(--background-modifier-border)",
+      borderRadius: "var(--radius-m)",
+      background: "var(--background-modifier-form-field)",
+      color: "var(--text-normal)",
+    });
     input.addEventListener("input", () => options.onChange(input.value));
     return input;
   }

@@ -188,7 +188,7 @@ export class RecycleBinModal extends Modal {
 
     const hasRows =
       !this.loading && this.error === null && this.vaultId() !== null && this.files.length > 0;
-    this.footerEl.style.display = hasRows ? "flex" : "none";
+    this.footerEl.setCssStyles({ display: hasRows ? "flex" : "none" });
 
     if (this.loading) {
       this.renderSkeleton();

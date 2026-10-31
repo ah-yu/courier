@@ -152,6 +152,10 @@ if (plugin !== null) {
     if (!plugin.description.endsWith(".")) {
       failures.push(`${source}: description must end with a period`);
     }
+    // The directory rejects the word in the listing: "Obsidian" is implied by the context.
+    if (/obsidian/i.test(plugin.description)) {
+      failures.push(`${source}: description must not contain "Obsidian"`);
+    }
   }
   if (typeof plugin.isDesktopOnly !== "boolean") {
     failures.push(`${source}: isDesktopOnly must be a boolean`);
