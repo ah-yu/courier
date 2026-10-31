@@ -238,10 +238,10 @@ export class SetupConnectionModal extends Modal {
     this.chipsEl.empty();
     if (count === 0) {
       // Do not leave an empty row behind: the card's gap would still add height.
-      this.chipsEl.style.display = "none";
+      this.chipsEl.setCssStyles({ display: "none" });
       return;
     }
-    this.chipsEl.style.display = "";
+    this.chipsEl.setCssStyles({ display: "" });
 
     const shown = this.excludedFolders.slice(0, 3);
     for (const folder of shown) {

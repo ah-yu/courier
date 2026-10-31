@@ -212,6 +212,8 @@ jobs:
     permissions:
       contents: write
       actions: read
+      attestations: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -237,6 +239,13 @@ jobs:
           done
           test -s "$(ls release-assets/courier-plugin-*.zip)"
           cat release-assets/*.sha256 | sort > release-assets/checksums.txt
+
+      # The community directory recommends provenance for the release assets; the
+      # attestation also lets anyone verify that a download came from this workflow.
+      - name: Attest the release assets
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release-assets/*
 
       - name: Publish release
         env:

@@ -122,7 +122,11 @@ export class ExcludedFoldersModal extends Modal {
     contentEl.empty();
     // Keep the dialog inside a settings window that is shorter than the tree; the tree
     // itself scrolls, and this is the safety net for a very small window.
-    contentEl.style.cssText = "min-width: min(520px, 80vw); max-height: 70vh; overflow-y: auto;";
+    contentEl.setCssStyles({
+      minWidth: "min(520px, 80vw)",
+      maxHeight: "70vh",
+      overflowY: "auto",
+    });
 
     this.summaryEl = contentEl.createDiv({ cls: "courier-excluded-folders-summary" });
     this.updateSummary();
@@ -157,7 +161,7 @@ export class ExcludedFoldersModal extends Modal {
   private renderNode(parentEl: HTMLElement, node: ExcludedFolderNode): void {
     const nodeEl = parentEl.createDiv({ cls: "courier-excluded-folder-node" });
     const row = nodeEl.createDiv({ cls: "courier-excluded-folder-row" });
-    row.style.paddingLeft = `${node.depth * 20 + 4}px`;
+    row.setCssStyles({ paddingLeft: `${node.depth * 20 + 4}px` });
 
     let childrenEl: HTMLElement | null = null;
     if (node.children.length > 0) {
@@ -169,7 +173,7 @@ export class ExcludedFoldersModal extends Modal {
         else this.collapsed.add(node.path);
         const isCollapsed = this.collapsed.has(node.path);
         setIcon(toggle, isCollapsed ? "chevron-right" : "chevron-down");
-        if (childrenEl) childrenEl.style.display = isCollapsed ? "none" : "";
+        if (childrenEl) childrenEl.setCssStyles({ display: isCollapsed ? "none" : "" });
       });
     } else {
       row.createSpan({ cls: "courier-excluded-folder-spacer" });
@@ -205,7 +209,7 @@ export class ExcludedFoldersModal extends Modal {
 
     if (node.children.length > 0) {
       childrenEl = nodeEl.createDiv({ cls: "courier-excluded-folder-children" });
-      if (this.collapsed.has(node.path)) childrenEl.style.display = "none";
+      if (this.collapsed.has(node.path)) childrenEl.setCssStyles({ display: "none" });
       for (const child of node.children) this.renderNode(childrenEl, child);
     }
   }

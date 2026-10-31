@@ -3,7 +3,7 @@
   "name": "Courier",
   "version": "0.1.0",
   "minAppVersion": "1.8.7",
-  "description": "Sync your Obsidian vault across devices.",
+  "description": "Sync your vault across devices with end-to-end encryption on your own server.",
   "author": "Zheyu Zhang",
   "authorUrl": "",
   "isDesktopOnly": false

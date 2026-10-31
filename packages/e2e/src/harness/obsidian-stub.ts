@@ -45,6 +45,16 @@ export interface FakeEl {
   click: () => void;
   style: Record<string, string>;
   /**
+   * Assign several style properties at once — Obsidian's `setCssStyles`.
+   *
+   * The real method writes each entry onto the element's style, so the fake records the
+   * same properties: a plugin that moved off `style.cssText` must remain testable, and
+   * an element that threw here would take a branch the app never takes.
+   */
+  setCssStyles: (styles: Partial<CSSStyleDeclaration>) => void;
+  /** Set CSS custom properties — Obsidian's `setCssProps`. */
+  setCssProps: (props: Record<string, string>) => void;
+  /**
    * The element's scroll offset, like the real DOM property.
    *
    * `empty()` puts it back to 0, as a real scroller does when its content is removed: the
@@ -149,6 +159,14 @@ export function createFakeEl(tagName = "div"): FakeEl {
       for (const cb of el.listeners.click ?? []) cb(event);
     },
     style: {},
+    setCssStyles(styles) {
+      for (const [property, value] of Object.entries(styles)) {
+        if (value !== undefined) el.style[property] = String(value);
+      }
+    },
+    setCssProps(props) {
+      for (const [property, value] of Object.entries(props)) el.style[property] = value;
+    },
     scrollTop: 0,
     rect: { left: 0, top: 0, width: 0, height: 0 },
     getBoundingClientRect() {
