@@ -6,6 +6,7 @@
  * `docs` (the agent contract stays within its size cap and the docs index is
  * complete) -> `agent-safety` (the workspace-scoped delete helper's refusals) ->
  * `migrations` (the generated chain matches `drizzle/`) -> `lint` (oxlint) ->
+ * `review` (the community directory's scanner, mirrored by `eslint.config.mjs`) ->
  * `typecheck` (tsc --noEmit in every package) -> `test` (Vitest on Bun, every
  * project in `vitest.config.ts`).
  * Every selected gate always runs — an incomplete picture costs more than the
@@ -16,7 +17,7 @@
  * non-zero exit code, which makes this command usable as a CI gate as well.
  *
  * Usage:
- *   bun run verify                 # default gates: docs, agent-safety, migrations, lint, typecheck, test
+ *   bun run verify                 # default gates: docs, agent-safety, migrations, lint, review, typecheck, test
  *   bun run verify test            # only the named gates
  *   bun run verify format          # opt-in gates (formatting)
  *   bun run verify obsidian        # end-to-end against a real running Obsidian
@@ -24,9 +25,10 @@
  *
  * Gates: docs (AGENTS.md cap + docs index/links), agent-safety (the delete
  * helper's refusals and recursive removal), migrations (the generated chain), lint,
- * typecheck, test, format (`oxfmt --check`), coverage (the per-package ratchet),
- * obsidian (real Obsidian over the official CLI), obsidian-ci (the same suite
- * without the cases that read rendered geometry).
+ * review (the community-directory scanner, mirrored), typecheck, test, format
+ * (`oxfmt --check`), coverage (the per-package ratchet), obsidian (real Obsidian over
+ * the official CLI), obsidian-ci (the same suite without the cases that read rendered
+ * geometry).
  */
 import { spawnSync } from "child_process";
 import { dirname, join } from "path";
@@ -80,6 +82,17 @@ const GATES = [
     default: true,
   },
   { name: "lint", command: "bun", args: ["run", "lint"], default: true },
+  {
+    // The community directory reviews the whole repository, not only the plugin, so an
+    // error in another package can fail the plugin's review. `eslint.config.mjs`
+    // reproduces that scan (its rule set, its ignore list), and only the findings the
+    // directory calls errors fail it. Cheap (seconds) and not a second style gate:
+    // `lint` still owns this repository's own style.
+    name: "review",
+    command: "bun",
+    args: ["run", "lint:review"],
+    default: true,
+  },
   { name: "typecheck", command: "bun", args: ["run", "typecheck"], default: true },
   { name: "test", command: "bun", args: ["run", "test"], default: true },
   { name: "format", command: "bun", args: ["run", "format:check"], default: false },

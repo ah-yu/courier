@@ -18,6 +18,6 @@
     "strict": false,
     "noImplicitAny": false
   },
-  "include": ["scripts/**/*.ts", "packages/*/scripts/**/*.ts"],
+  "include": ["eslint.config.ts", "scripts/**/*.ts", "packages/*/scripts/**/*.ts"],
   "exclude": ["node_modules", "dist", "build"]
 }

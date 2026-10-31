@@ -145,6 +145,29 @@ The plugin is published from this repository, so the directory's rules are relea
   for full functionality, and where the plugin's network requests go. The linked usage guide is
   [quick-start.md](quick-start.md).
 
+#### The review scanner, mirrored
+
+The directory's automated review scans the **whole repository**, not only `packages/plugin/`, with
+`eslint-plugin-obsidianmd` and its own fixed ignore list; it does not read this repository's
+config. A monorepo therefore cannot opt out of that scan, and an error anywhere can fail the
+plugin's review.
+
+[`eslint.config.ts`](../eslint.config.ts) reproduces that scan (`bun run lint:review`, a default
+`bun run verify` gate). The gate prints errors only; `bunx eslint .` prints the warnings too. The
+config is a `.ts` file, so the directory scans it as well (its ignore list covers `.mjs`, `.cjs`,
+`.mts` and `.cts`, not `.ts`): it is listed in `tsconfig.scripts.json` so the type-aware rules can
+resolve it, and it has to stay clean under them.
+
+- it runs the same rule set (`eslint-plugin-obsidianmd`, pinned in `package.json`);
+- it applies the directory's fixed ignore list (in the config; the list comes from its FAQ);
+- it fails only on the rules the directory reports as **Error** — everything it reports as a
+  warning stays a warning, because a warning never fails the review.
+
+Three things must stay in step with the directory: the ignore list and `DIRECTORY_ERROR_RULES` in
+the config, and the `eslint-plugin-obsidianmd` version. The mirror cannot judge the directory's
+non-ESLint checks (manifest, release assets, build verification) — `scripts/check-release.ts` owns
+the manifest half, and the release workflow builds the assets.
+
 ### Manual smoke check (L4)
 
 The automated layers stop at "the values are right" — the stub records the DOM, it does not draw it.

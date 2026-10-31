@@ -9,6 +9,7 @@
     "dev": "bun run --filter '*' --parallel dev",
     "build": "bun run --filter '*' build",
     "lint": "oxlint --deny-warnings",
+    "lint:review": "eslint --quiet .",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
     "test": "bun --bun vitest run",
@@ -33,6 +34,8 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@vitest/coverage-v8": "5.0.5",
+    "eslint": "^10.14.0",
+    "eslint-plugin-obsidianmd": "^0.4.2",
     "lint-staged": "^17.0.7",
     "oxfmt": "^0.75.0",
     "oxlint": "^1.69.0",
@@ -41,6 +44,7 @@
     "vitest": "5.0.5"
   },
   "overrides": {
+    "@types/node": "25.9.2",
     "moment": "2.31.0"
   },
   "simple-git-hooks": {
