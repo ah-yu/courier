@@ -1,0 +1,11 @@
+{
+  "name": "@courier/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@courier/testing": "workspace:*"
+  }
+}

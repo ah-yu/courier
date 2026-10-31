@@ -1,0 +1,65 @@
+{
+  "name": "courier",
+  "version": "0.0.0-dev.20261031.196fa6c",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '*' --parallel dev",
+    "build": "bun run --filter '*' build",
+    "lint": "oxlint --deny-warnings",
+    "format": "oxfmt --write --no-error-on-unmatched-pattern \"packages/**/*.{ts,tsx,js,json,css,html,md}\" \"scripts/**/*.ts\" \"docs/**/*.md\" \"*.md\"",
+    "format:check": "oxfmt --check --no-error-on-unmatched-pattern \"packages/**/*.{ts,tsx,js,json,css,html,md}\" \"scripts/**/*.ts\" \"docs/**/*.md\" \"*.md\"",
+    "test": "bun --bun vitest run",
+    "test:coverage": "bun --bun vitest run --coverage",
+    "test:watch": "bun --bun vitest",
+    "test:bench-report": "bun --bun vitest run scripts/bench-report.test.ts",
+    "bench": "bun scripts/bench.ts",
+    "bench:report": "bun scripts/bench-report.ts",
+    "verify": "bun scripts/verify.ts",
+    "check:docs": "bun scripts/check-docs.ts",
+    "version:snapshot": "bun scripts/version.ts",
+    "safe-delete": "bun scripts/safe-delete.ts",
+    "test:safe-delete": "bun --bun vitest run scripts/safe-delete.test.ts",
+    "e2e:obsidian": "bun packages/e2e/scripts/setup-obsidian-vaults.ts",
+    "e2e:obsidian:demo": "bun packages/e2e/scripts/obsidian-demo.ts",
+    "demo:vault": "bun scripts/demo-large-vault.ts",
+    "preview:ui": "bun packages/e2e/scripts/preview-ui.ts",
+    "typecheck": "bun run --filter '*' typecheck && tsc --noEmit -p tsconfig.scripts.json",
+    "prepare": "simple-git-hooks",
+    "db:studio": "bun run --filter @courier/server db:studio"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@vitest/coverage-v8": "5.0.5",
+    "lint-staged": "^17.0.7",
+    "oxfmt": "^0.75.0",
+    "oxlint": "^1.69.0",
+    "simple-git-hooks": "^2.13.1",
+    "typescript": "^6.0.3",
+    "vitest": "5.0.5"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "bun lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "oxfmt --write --no-error-on-unmatched-pattern",
+      "oxlint --deny-warnings",
+      "bash -c 'bun run typecheck' --",
+      "bun --bun vitest related --run"
+    ],
+    "*.{json,css,html,md,yaml}": [
+      "oxfmt --write --no-error-on-unmatched-pattern"
+    ]
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "packageManager": "bun@1.4.4",
+  "trustedDependencies": [
+    "esbuild",
+    "simple-git-hooks"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@courier/server",
+  "version": "0.0.0-dev.20261031.196fa6c",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun scripts/ensure-db.ts && bun --watch src/main.ts start",
+    "migrate": "bun scripts/generate-migrations.ts && bun src/main.ts migrate",
+    "migrations:generate": "bun scripts/generate-migrations.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "bun scripts/generate-migrations.ts --check && tsc",
+    "start": "bun dist/index.js",
+    "build:exe": "bun scripts/generate-migrations.ts --check && bun scripts/build-exe.ts",
+    "manifest": "bun scripts/build-manifest.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@courier/shared": "workspace:*",
+    "commander": "^15.0.0",
+    "drizzle-orm": "1.0.0-beta.22",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@courier/build": "workspace:*",
+    "@courier/testing": "workspace:*",
+    "drizzle-kit": "1.0.0-beta.22"
+  }
+}

@@ -1,0 +1,100 @@
+name: L3 (real Obsidian)
+
+# The real-Obsidian layer, on a headless Ubuntu runner: a pinned Obsidian build
+# under Xvfb, driven through the official CLI by `packages/e2e/src/obsidian/`.
+# The rendered-geometry assertions stay on the reference platform (Windows by
+# default; different fonts, DPI and theme); everything else runs here.
+#
+# Cost: this is the reason for the `paths` filter. Only a change on the sync
+# path spends the account's included GitHub-hosted minutes; docs changes never
+# start it. `concurrency` cancels an older run of the same ref.
+on:
+  pull_request:
+    paths:
+      - "packages/**"
+      - "package.json"
+      - "bun.lock"
+      - ".bun-version"
+      - "tsconfig.base.json"
+      - "vitest.config.ts"
+      - ".github/**"
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "package.json"
+      - "bun.lock"
+      - ".bun-version"
+      - "tsconfig.base.json"
+      - "vitest.config.ts"
+      - ".github/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: l3-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  l3-obsidian:
+    name: L3 (real Obsidian, Xvfb)
+    runs-on: ubuntu-24.04
+    # Warm, this job is ~3 minutes. The cap only matters when a runner's package
+    # mirror is slow: on 2026-10-22 a 28-minute font download killed it about a
+    # minute into the suite, and a run killed at the cap says nothing about the code.
+    timeout-minutes: 40
+    env:
+      # Electron in a container has no usable sandbox/GPU; software rendering
+      # is what Xvfb provides.
+      COURIER_OBSIDIAN_APP_FLAGS: "--no-sandbox --disable-gpu --disable-dev-shm-usage"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - uses: ./.github/actions/obsidian-linux
+
+      - name: Run the non-layout L3 suite
+        env:
+          COURIER_OBSIDIAN_E2E: "1"
+          COURIER_OBSIDIAN_E2E_LAYOUT: "0"
+          # Register both vaults as open: there is no desktop-file handler for
+          # obsidian:// on the runner, so the cold start restores their windows.
+          COURIER_E2E_OPEN_VAULTS: "1"
+        run: |
+          set -euo pipefail
+          # A file, not `bash -s` from a heredoc: the CLI reads stdin, and a
+          # heredoc script shares that stdin, so a command can swallow the rest
+          # of the script and leave the step green without running the suite.
+          script="$RUNNER_TEMP/run-l3.sh"
+          cat > "$script" <<'EOF'
+          set -uo pipefail
+          fluxbox >/tmp/fluxbox.log 2>&1 &
+          status=0
+          bun run e2e:obsidian || status=$?
+          if [ "$status" -eq 0 ]; then bun run verify obsidian-ci || status=$?; fi
+          if [ "$status" -ne 0 ]; then
+            # Keep the diagnosis inside the Xvfb session: the app exits with the
+            # X server, so this must run before the shell returns.
+            obsidian dev:errors >/tmp/obsidian-errors.txt 2>&1 || true
+            obsidian dev:console limit=300 >/tmp/obsidian-console.txt 2>&1 || true
+          fi
+          exit "$status"
+          EOF
+          chmod +x "$script"
+          xvfb-run --auto-servernum \
+            --server-args="-screen 0 1920x1080x24 -dpi 96 -extension MIT-SHM -nolisten tcp" \
+            bash "$script" </dev/null
+
+      - name: Upload Obsidian diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l3-obsidian-diagnostics
+          path: |
+            /tmp/obsidian-errors.txt
+            /tmp/obsidian-console.txt
+            /tmp/fluxbox.log
+          if-no-files-found: ignore

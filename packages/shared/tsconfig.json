@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    // `DOM` for the globals every host already provides (`TextEncoder`/`TextDecoder`
+    // in the wire frame, `btoa`/`atob` nowhere else) — the same lib the engine uses.
+    // Nothing here touches a DOM API: the module is pure and dependency-free.
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}
