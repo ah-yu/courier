@@ -96,7 +96,16 @@ The tag push starts `.github/workflows/release.yml`, which:
 2. `verify` runs the same `bun run verify` and `bun run verify format` gates as CI;
 3. `server`, `cli` and `plugin` build in parallel;
 4. `release` downloads the three artifacts, checks every expected file, writes `checksums.txt`,
-   creates a **draft** release, uploads the assets, then publishes it.
+   creates a **draft** release, uploads the assets, then publishes it;
+5. `cnb` (optional) mirrors the published assets to cnb.cool. It is skipped when the repository
+   variable `CNB_REPO` is unset, and a failure there cannot fail the release. Only stable releases
+   are mirrored; tags containing a hyphen (release candidates and snapshot builds) are skipped.
+   The `latest` alias is updated only when GitHub reports the tag as the latest stable release, so
+   re-running an old release does not move the stable download channel backwards.
+
+The `cnb` job is a download mirror, not a second build: it uploads the same bytes, so the
+manifests and `checksums.txt` verify either location. Setup, the stable URL and the failure modes
+are in [cnb-mirror.md](cnb-mirror.md).
 
 The release is created from the tag commit with generated release notes. Re-running a failed
 workflow is safe: a draft release is completed, and an existing release has its assets replaced with
@@ -209,6 +218,10 @@ This repository's releases are public, so the install scripts read the assets th
 `COURIER_SERVER_RELEASE_URL` / `COURIER_CLI_RELEASE_URL`; an installer that needs a token for a
 private mirror documents its own flow.
 
+The repository also maintains a public CNB (cnb.cool) mirror of the same assets, with the stable
+base `https://cnb.cool/<repo>/-/releases/download/latest`. Its setup, its versioned URLs and the
+`latest` alias convention are in [cnb-mirror.md](cnb-mirror.md).
+
 ### Installing the Obsidian plugin
 
 - **Manual:** download `main.js`, `manifest.json` and `styles.css` into
@@ -233,14 +246,17 @@ manifest does the same per platform.
 
 ## Failure modes
 
-| Failure                                       | Result                                                                    |
-| --------------------------------------------- | ------------------------------------------------------------------------- |
-| tag does not match the four version files     | `preflight` fails; nothing is built or published                          |
-| the root manifest differs from the plugin one | `check-release` fails in CI and in `preflight`; nothing is built          |
-| a gate fails (`bun run verify`, formatting)   | no build jobs start                                                       |
-| a binary, manifest, bundle or zip is missing  | the artifact upload or the release job fails; no publication              |
-| an upload fails midway                        | the release stays a draft; re-run the workflow to finish it               |
-| the repository token cannot write releases    | the `release` job fails; allow `contents: write` for Actions or use a PAT |
+| Failure                                       | Result                                                                                       |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| tag does not match the four version files     | `preflight` fails; nothing is built or published                                             |
+| the root manifest differs from the plugin one | `check-release` fails in CI and in `preflight`; nothing is built                             |
+| a gate fails (`bun run verify`, formatting)   | no build jobs start                                                                          |
+| a binary, manifest, bundle or zip is missing  | the artifact upload or the release job fails; no publication                                 |
+| an upload fails midway                        | the release stays a draft; re-run the workflow to finish it                                  |
+| the repository token cannot write releases    | the `release` job fails; allow `contents: write` for Actions or use a PAT                    |
+| the CNB mirror fails (outage, token, quota)   | the `cnb` job is marked failed but allowed; the GitHub release is unaffected; re-run the job |
+| an older release's CNB job is re-run          | only that version's release is updated; `latest` and CNB's latest flag stay with the newest  |
 
-No extra secrets are required; the release job uses the automatic `GITHUB_TOKEN`. The workflow
-requests `contents: write` only in that job.
+No extra secrets are required for the GitHub release itself; the `release` job uses the automatic
+`GITHUB_TOKEN` and requests `contents: write` only there. The optional CNB mirror uses the
+`CNB_TOKEN` secret (see [cnb-mirror.md](cnb-mirror.md)).
