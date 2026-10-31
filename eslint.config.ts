@@ -66,6 +66,21 @@ const DIRECTORY_IGNORES: string[] = [
   "**/locales/**",
   "**/translations/**",
   "**/l10n/**",
+  /*
+   * This checkout's local, gitignored artifacts. The directory's scan never sees
+   * them (a fresh clone has no dev vaults, coverage, sibling worktrees or a
+   * development database), but scanning them locally exhausts the heap and lints
+   * other branches' code — so they are ignored here, not in the directory's list.
+   */
+  ".agents/**",
+  ".e2e-vaults/**",
+  ".courier-dev/**",
+  ".bun-cache/**",
+  "coverage/**",
+  "reports/**",
+  "vault_a*/**",
+  "vault_b*/**",
+  "packages/server/data/**",
 ];
 
 /**
