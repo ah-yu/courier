@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Type-check only. `scripts/build.ts` (`Bun.build`) is the single source of `dist/main.js`
+    // (the only file Obsidian loads), so `tsc` must never emit: a previous
+    // `tsc -b` wrote the whole `src/` tree — including `*.test.js` — into
+    // `dist/`, where the test runner collected it as a stale duplicate test.
+    "noEmit": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["bun"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "src/__mocks__"]
+}

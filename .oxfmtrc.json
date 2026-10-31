@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "reports",
+    ".bun-cache",
+    ".e2e-vaults",
+    "vault_a*",
+    "vault_b*",
+    "**/routeTree.gen.ts",
+    "**/migrations.generated.ts",
+    "bun.lock",
+    ".agents/skills"
+  ]
+}

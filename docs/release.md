@@ -1,0 +1,215 @@
+# CI and releases
+
+> **Status: authoritative.** This is the single source of truth for the GitHub Actions
+> workflows, the version/tag rule and the assets a release publishes. See `docs/README.md`
+> for the documentation index.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and `dev`, on every pull request, and on
+manual dispatch. It uses Ubuntu and the Bun version pinned by `.bun-version` (also named by
+`packageManager` in the root `package.json`); `.github/actions/setup` installs it and runs
+`bun install --frozen-lockfile`.
+
+`l3-obsidian.yml` is the real-Obsidian layer: it runs on pull requests and pushes to `main` whose
+`paths` touch the sync path, plus manual dispatch, so a docs-only change never spends a run.
+`.github/actions/obsidian-linux` installs a pinned Obsidian Linux build (with its CLI) under
+Xvfb; the version and sha256 live in that action and are bumped together.
+
+`bench.yml` runs the sync benchmark: three scenarios (many small files, one large chunked file,
+renames and deletes) against the merge base and the pull request on the same runner, then posts a
+sticky comment with the medians. It runs only for pull requests whose `paths` touch the sync path,
+and on manual dispatch (one run per scenario, head only); it is **not** a gate — only the
+benchmark's correctness invariants can fail it. The scenarios, the comparison rules and the cost
+are in [ci-sync-benchmarks.md](ci-sync-benchmarks.md).
+
+| Job           | What it runs                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------ |
+| `verify`      | `bun scripts/check-release.ts`, `bun run verify`, `bun run verify format`, `bun run build` |
+| `l3-obsidian` | pinned Obsidian under Xvfb: `bun run e2e:obsidian`, then `bun run verify obsidian-ci`      |
+
+`bun run verify` covers the docs index, the generated migration chain, lint, typecheck and the test
+suite (L0–L2, including the in-memory end-to-end suites). CI **does not** run:
+
+- the **rendered-geometry** L3 assertions (`COURIER_OBSIDIAN_E2E_LAYOUT=0`): the `itL` halves of
+  the history, conflict-comparison and status-bar cases, plus the file-explorer dimming checks
+  inside the excluded-folders case. They are a **reference-platform** contract (Windows by
+  default, `COURIER_OBSIDIAN_LAYOUT_PLATFORM` moves it); fonts, DPI and the theme differ per OS,
+  so CI runs their behavioural halves through `bun run verify obsidian-ci` and skips the
+  measurements;
+- `bun run test:coverage`: the coverage floors are a boundary check, not an inner-loop gate (the
+  instrumented run costs a couple of minutes);
+- the compiled binary builds: the release workflow builds those.
+
+The binary build jobs run `bun build --compile` (see `@courier/build`, shared by both binaries) for each target. Bun
+downloads the target's runtime and embeds it, so a Linux runner can produce the darwin-arm64 and
+win-x64 assets too, and no host runtime has to match anything: the version is pinned once in
+`.bun-version`, which `.github/actions/setup` installs. There is no blob-assembly step, no separate
+build host and no cross-architecture cache to seed — the same command produces all three assets.
+What the produced binaries need from the machine that _runs_ them is in
+[Linux binaries need nothing extra](#linux-binaries-need-nothing-extra).
+
+### Snapshot versions for test builds
+
+A test build is not a release, so it carries `0.0.0-dev.YYYYMMDD.<shortsha>`:
+
+```bash
+bun run version:snapshot
+```
+
+`scripts/version.ts` writes that value into the three files listed below, with the date in UTC and
+the current commit's short sha (the CI-provided revision when git is unavailable). The committed
+value is a snapshot too, so a fresh clone is buildable; run the script before a build you want to
+trace back to a commit. The form is valid semver, so `check-release.ts` (the three agree) still
+runs in CI. A real release replaces it with `X.Y.Z` by hand.
+
+## Release procedure
+
+The three packages ship together under one product version:
+
+- `packages/server/package.json` → `version`
+- `packages/cli/package.json` → `version`
+- `packages/plugin/manifest.json` → `version`
+
+`scripts/check-release.ts` enforces this. With no argument it checks the three agree (the CI
+step); with a tag it also checks they equal the tag (the release preflight). A mismatch fails before
+anything is built.
+
+1. Bump all three versions to the same value, for example `0.1.0` (replacing the snapshot).
+2. Run `bun scripts/check-release.ts v0.1.0` and commit the bump.
+3. Tag and push:
+
+   ```bash
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+
+The tag push starts `.github/workflows/release.yml`, which:
+
+1. `preflight` validates the tag against the three versions and captures the version;
+2. `verify` runs the same `bun run verify` and `bun run verify format` gates as CI;
+3. `server`, `cli` and `plugin` build in parallel;
+4. `release` downloads the three artifacts, checks every expected file, writes `checksums.txt`,
+   creates a **draft** release, uploads the assets, then publishes it.
+
+The release is created from the tag commit with generated release notes. Re-running a failed
+workflow is safe: a draft release is completed, and an existing release has its assets replaced with
+`--clobber`. A tag containing a hyphen (for example `v0.1.0-rc.1`) is published as a prerelease, so
+`releases/latest` keeps pointing at the latest stable release.
+
+### Manual smoke check (L4)
+
+The automated layers stop at "the values are right" — the stub records the DOM, it does not draw it.
+Before a release, with a real Obsidian and a real vault, spend a few minutes on the parts only a
+person can judge:
+
+- open Settings → Courier and scroll the page, then the sync-history dialog: no section clipped, the
+  title stays put while the list scrolls;
+- hover a note in the explorer: the version-history chip appears without shifting the row; open the
+  tab and click through two versions;
+- park a conflict copy and open its comparison on a phone: one readable column, the replace
+  confirmation reachable;
+- open the status bar menu and the account-usage bars: every row at one label size, the bars filled
+  but never past their track;
+- switch Obsidian's UI language and repeat the two dialogs above — a translated string can be a line
+  longer than its box;
+- `bun run preview:ui` renders the settings page to a PNG when a screenshot says it faster than words
+  (see [plugin-ui-preview.md](plugin-ui-preview.md)).
+
+Anything that fails here becomes an `itL` case in `packages/e2e/src/obsidian/` (a rendered-geometry
+assertion, reference platform only) or a plain bug — not a note that "it looked off once".
+
+## Published assets
+
+| Asset                                                                                                      | Consumer                                                          |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `courier-server-linux-x64`, `courier-server-darwin-arm64`, `courier-server-win-x64.exe` and each `.sha256` | the server deployment                                             |
+| `courier-server-manifest.json`                                                                             | the server update check                                           |
+| `courier-cli-linux-x64`, `courier-cli-darwin-arm64`, `courier-cli-win-x64.exe` and each `.sha256`          | headless `courier-cli`                                            |
+| `courier-cli-manifest.json`                                                                                | the CLI install/upgrade check                                     |
+| `main.js`, `manifest.json`, `styles.css`                                                                   | Obsidian plugin (manual install or BRAT)                          |
+| `courier-plugin-X.Y.Z.zip`                                                                                 | manual install; contains a `courier/` folder with the three files |
+| `checksums.txt`                                                                                            | verifying any binary before running it                            |
+
+### The CLI manifest carries one asset per platform
+
+`courier-cli-manifest.json` is generated by `bun run --filter @courier/cli manifest` after the
+three compiled binaries exist. Its `assets` map is keyed by `win-x64`, `linux-x64` and
+`darwin-arm64`; each entry carries the asset name, checksum and size. An installer
+downloads this small file, picks its own platform, and verifies the binary's SHA-256 before
+replacing anything. The server manifest cannot be reused because it describes exactly one
+Linux x64 asset, which is the only target a deployment has.
+
+### Linux binaries need nothing extra
+
+Both binaries embed the Bun runtime, and Bun's Linux build is self-contained: it links glibc and
+nothing else. The install table in [`docs/cli.md`](cli.md) therefore has no system-package step,
+and an installer has no library probe or package install of its own.
+
+### Why the server manifest is not `manifest.json`
+
+An Obsidian plugin release must carry a file named exactly `manifest.json`, and the server installer
+looks for the server update manifest beside the server binary. One GitHub release cannot hold both
+under the same name, so the server manifest is `courier-server-manifest.json`. See
+[`docs/cli.md`](cli.md#information-about-the-server-itself) for the contract.
+
+The release address is built in: `https://github.com/ah-yu/courier/releases/latest/download`. An
+installer appends `/courier-server-manifest.json` itself. A deployment's address field and
+`COURIER_SERVER_RELEASE_URL` / `COURIER_CLI_RELEASE_URL` override it for a mirror or a pinned
+prerelease; the CLI install has no address field, so it always uses the built-in address (or that
+environment override). The manifest describes the Linux x64 asset, which is the deployment target;
+the macOS and Windows binaries are published with their own `.sha256` files.
+
+### Moving the repository
+
+The release address is compiled into installers, so renaming or transferring this
+repository means updating their copy of the address and rebuilding them: an installed build keeps
+the address it was compiled with. GitHub redirects the old
+repository URLs for a while, and the resolver follows the extra API redirect a renamed repository
+produces, so old builds usually keep working during the transition — but do not rely on it.
+Redirects are permanently deleted if a new repository or fork is created at the old location, and a
+fine-grained token scoped to the old owner may lose access after a transfer.
+`COURIER_SERVER_RELEASE_URL` / `COURIER_CLI_RELEASE_URL` can point an existing build at the new
+address until it is rebuilt.
+
+### Private mirrors
+
+This repository's releases are public, so the install scripts read the assets through the anonymous
+`releases/latest/download` URLs. A mirror, or a pinned prerelease, is selected with
+`COURIER_SERVER_RELEASE_URL` / `COURIER_CLI_RELEASE_URL`; an installer that needs a token for a
+private mirror documents its own flow.
+
+### Installing the Obsidian plugin
+
+- **Manual:** download `main.js`, `manifest.json` and `styles.css` into
+  `<vault>/.obsidian/plugins/courier/`, or unzip `courier-plugin-X.Y.Z.zip` into
+  `<vault>/.obsidian/plugins/`, then enable Courier in Obsidian's community plugins.
+- **BRAT:** add the repository and use the release; BRAT reads the flat `main.js`, `manifest.json`
+  and `styles.css` assets.
+
+## Checksums
+
+Every binary is published with a `<asset>.sha256` file in the shape `sha256sum` writes, and
+`checksums.txt` collects all of them:
+
+```bash
+sha256sum -c courier-server-linux-x64.sha256
+sha256sum -c checksums.txt
+```
+
+The server manifest also carries the Linux x64 binary's `sha256` and `size`; an installer
+uses that pair to decide whether the published build is the same one it already runs. The CLI
+manifest does the same per platform.
+
+## Failure modes
+
+| Failure                                       | Result                                                                    |
+| --------------------------------------------- | ------------------------------------------------------------------------- |
+| tag does not match the three package versions | `preflight` fails; nothing is built or published                          |
+| a gate fails (`bun run verify`, formatting)   | no build jobs start                                                       |
+| a binary, manifest, bundle or zip is missing  | the artifact upload or the release job fails; no publication              |
+| an upload fails midway                        | the release stays a draft; re-run the workflow to finish it               |
+| the repository token cannot write releases    | the `release` job fails; allow `contents: write` for Actions or use a PAT |
+
+No extra secrets are required; the release job uses the automatic `GITHUB_TOKEN`. The workflow
+requests `contents: write` only in that job.

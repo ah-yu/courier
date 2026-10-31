@@ -1,0 +1,93 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "no-console": "off",
+    "no-debugger": "error",
+    "import/no-unassigned-import": "off",
+    "react/react-in-jsx-scope": "off"
+  },
+  "overrides": [
+    {
+      "files": ["packages/server/src/**/*.ts"],
+      "rules": {
+        "no-console": ["error", { "allow": ["error", "warn"] }]
+      }
+    },
+    {
+      "files": ["packages/server/src/handlers/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["../db", "../db/*", "../../db", "../../db/*"],
+                "message": "A handler takes its DB operations as injected *Fn arguments (see src/db/repositories); it must not import the database."
+              },
+              {
+                "group": ["../routes/*"],
+                "message": "A handler must not depend on the HTTP layer."
+              },
+              {
+                "group": ["fs", "fs/*"],
+                "message": "File access is injected as a *Fn (see lib/blob-store)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/server/src/middleware/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["../db", "../db/*", "../../db", "../../db/*"],
+                "message": "A middleware takes its lookups as injected *Fn arguments (see lib/user-credentials, lib/vault-access)."
+              },
+              {
+                "group": ["../routes/*"],
+                "message": "A middleware must not depend on the routes it guards."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/server/src/routes/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["drizzle-orm", "drizzle-orm/*"],
+                "message": "A route is HTTP only: statements live in src/db/repositories."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "settings": {
+    "react": {
+      "version": "19",
+      "jsxRuntime": "automatic"
+    }
+  },
+  "env": {
+    "builtin": true,
+    "browser": true
+  },
+  "ignorePatterns": ["node_modules", "dist", "**/routeTree.gen.ts", "bun.lock", "**/pkg/**"]
+}

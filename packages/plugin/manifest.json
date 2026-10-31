@@ -1,0 +1,10 @@
+{
+  "id": "courier",
+  "name": "Courier",
+  "version": "0.0.0-dev.20261031.196fa6c",
+  "minAppVersion": "1.8.7",
+  "description": "Sync your Obsidian vault across devices",
+  "author": "Zheyu Zhang",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

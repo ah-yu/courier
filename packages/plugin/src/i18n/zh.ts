@@ -1,0 +1,493 @@
+/**
+ * The Simplified Chinese catalog.
+ *
+ * This object is the source of truth for every user-facing string in the plugin:
+ * `en.ts` is typed as a record over its keys, so a key added here without an
+ * English translation (or the reverse) fails the type check.
+ *
+ * Keys are flat and grouped by surface. Values may contain `{name}` placeholders;
+ * `t()` replaces them in one pass. Keep punctuation in the value itself — the
+ * catalogs own the whole sentence, not fragments glued together at call sites.
+ */
+export const zh = {
+  // ── Common ──
+  "common.cancel": "取消",
+  "common.ok": "确定",
+  "common.retry": "重试",
+  "common.restore": "恢复",
+  "common.listSeparator": "、",
+  "common.detailSeparator": "；",
+
+  // ── Action names for error prefixes ──
+  "action.signIn": "登录失败",
+  "action.createVault": "创建远程库失败",
+  "action.deleteVault": "删除远程库失败",
+  "action.fetchVaultInfo": "无法读取远程库的加密信息",
+  "action.verifyVaultPassword": "无法校验库密码",
+  "action.loadVaults": "无法加载远程库列表",
+  "action.loadHistory": "无法加载同步历史",
+  "action.loadRecycleBin": "无法加载回收站",
+
+  // ── Validation / API errors ──
+  "error.serverUrlRequired": "请填写服务器地址，例如 http://localhost:3002。",
+  "error.serverUrlScheme": "服务器地址需要以 http:// 或 https:// 开头。",
+  "error.serverUrlInvalid": "服务器地址格式不正确，请检查。",
+  "error.unreachable": "无法连接服务器。请检查地址、网络，以及服务器是否已启动。",
+  "error.keyExpired": "该用户密钥已过期，请联系服务器管理员。",
+  "error.keyDisabled": "该用户密钥已被停用，请联系服务器管理员。",
+  "error.keyInvalid": "用户密钥无效或已过期，请检查服务器地址与密钥。",
+  "error.vaultNotFound": "服务器上找不到这个远程库（可能已被删除）。",
+  "error.vaultLimitReached": "这个账号可创建的远程库数量已用完，请联系服务器管理员调整额度。",
+  "error.withDetails": "{fallback}：{details}",
+  "error.withMessage": "{fallback}：{message}",
+  "error.keyRequired": "请填写用户密钥（ck_…）。",
+  "error.keyPrefix": "用户密钥应以 ck_ 开头。",
+  "error.keyDerivation": "无法生成加密密钥，请重试。",
+  "error.signInKeyChanged": "登录期间用户密钥已更改，请重试。",
+  "error.vaultInfoMissing": "缺少库信息，请重新选择远程库。",
+  "error.passwordIncorrect": "库密码不正确。",
+  "error.noFileId": "无法定位这个文件的同步记录。",
+  "error.conflictOriginalUnknown": "无法识别这个冲突副本对应的原文件。",
+
+  // ── Notices ──
+  //
+  // A notice is for an event the user did not start, and that no persistent surface will
+  // show them. The result of the user's own click belongs to the surface they clicked in
+  // (the settings page, a picker, a dialog), and an error caused by that click stays
+  // inline there — see the `courier-setup-error` rows in the dialogs.
+  "notice.bindFailed": "首次同步未完成：{error}；插件会自动重试。",
+  "notice.syncStartFailed": "同步启动失败：{error}",
+  "notice.userKeyRequiredSettings": "同步需要用户密钥，请在 Courier 设置中填写。",
+  "notice.serverUnreachableKeepKey": "无法连接同步服务器。本机密钥已保留，下次启动会重试。",
+  "notice.storedCredentialInvalid": "已保存的凭据无法解锁这个远程库，请重新输入密码。",
+  "notice.needsResume": "同步已暂停：先在设置中继续同步。",
+  "notice.notConnected": "未连接远程库。",
+  "notice.remoteVaultDeleted": "远程库「{vault}」已被删除，正在断开连接。",
+  "notice.userKeyRevoked": "用户密钥已被撤销，正在断开连接。",
+  "notice.keyExpired": "用户密钥已过期，同步已暂停。续期后在设置中继续同步。",
+  "notice.keyDisabled": "用户密钥已被停用，同步已暂停。重新启用后在设置中继续同步。",
+  "notice.manualReload": "请手动退出并重新打开 Obsidian。",
+
+  // ── Settings page: login / choose / locked ──
+  "settings.login.serverAddress": "服务器地址",
+  "settings.login.userKey": "用户密钥",
+  "settings.login.submit": "登录",
+  "settings.login.submitting": "正在登录…",
+  "settings.account.reading": "读取账号中…",
+  "settings.account.unknown": "未知账号",
+  "settings.account.server": "服务器：{url}",
+  "settings.account.keyExpiry": "密钥有效期",
+  "settings.account.storage": "存储空间",
+  "settings.account.detailSeparator": "：",
+  "settings.account.expiryValue": "{date} · {remaining}",
+  "settings.account.usageUnavailable": "无法读取账号信息",
+  "settings.account.signOut": "退出登录",
+  "settings.choose.selectVault": "选择远程库",
+  "settings.choose.noVault": "当前未连接任何远程库。",
+  "settings.choose.button": "选择",
+  "settings.locked.bound": "已绑定「{vault}」",
+  "settings.locked.desc": "需要库密码解锁后才能同步。",
+  "settings.locked.unlockTitle": "解锁「{vault}」",
+  "settings.locked.unlock": "输入密码解锁",
+  "settings.locked.disconnect": "断开连接",
+  "settings.unverified.desc":
+    "库密钥已保存在这台设备，这次还没有得到服务器确认。可以现在重试，下次打开 Obsidian 也会再试一次。",
+  "settings.unverified.retry": "重试",
+  "settings.unverified.retrying": "正在重试…",
+  "settings.unverified.failed": "仍然无法连接服务器，请稍后再试。",
+
+  // ── Settings page: state and sections ──
+  "settings.state.paused": "⏸ 同步已暂停",
+  "settings.state.connected": "● 已连接",
+  "settings.state.connecting": "○ 连接中…",
+  "settings.state.error": "✕ 连接错误",
+  "settings.state.disconnected": "○ 已断开",
+  "settings.section.vault": "远程库",
+  "settings.section.vault.tooltip":
+    "本机与远程库的连接。暂停只停止同步，连接和本机凭据都会保留；断开连接会解除绑定并清除本机保存的库密码。两者都不会改动本地库文件或服务器上的内容。",
+  "settings.section.fileTypes": "同步的文件类型",
+  "settings.section.fileTypes.tooltip":
+    "Markdown 与 Canvas 始终同步。关闭的类型在这台设备上既不推送也不拉取，也不会删除任何一端的内容。",
+  "settings.section.excludedFolders": "排除的文件夹",
+  "settings.section.excludedFolders.tooltip":
+    "被排除的文件夹及其内容在这台设备上既不推送也不拉取，也不会生成冲突副本。排除不会删除已有文件，取消排除后继续同步。列表只对当前连接的远程库生效；一个都不选也算完成配置。配置文件夹（.obsidian）由下方的设置同步控制。",
+  "settings.section.settingsSync": "Obsidian 设置同步",
+  "settings.section.settingsSync.tooltip":
+    "配置文件夹（.obsidian）中的每组设置可单独开关；关闭的组不受其他设备影响，也不会生成冲突副本。两端都修改同一文件时，以最后修改时间较新的一份为准。拉取到的设置可能需要重新加载 Obsidian 才会生效；workspace 布局、缓存和本插件自身的配置永不同步。",
+  "settings.section.account": "账号",
+  "settings.section.account.tooltip":
+    "这台设备当前登录的账号。退出登录会清除本机保存的密钥与连接，服务器上的内容不受影响。",
+  "settings.section.device": "这台设备",
+  "settings.section.device.tooltip":
+    "这个名称只作为标签出现在当前远程库的同步历史中，每个远程库单独保存；服务器不注册设备，也不靠它识别身份。",
+  "settings.ready.connected": "已连接「{vault}」",
+  "settings.ready.disconnect": "断开连接",
+  "settings.pause.name": "同步",
+  "settings.pause.descRunning": "同步已开启。暂停只是停止这台设备的同步，不会断开远程库。",
+  "settings.pause.descPaused": "已暂停同步。本地修改不会上传，也不会下载其他设备的修改。",
+  "settings.pause.pause": "暂停同步",
+  "settings.pause.resume": "继续同步",
+  "settings.device.name": "设备名称",
+  "settings.device.desc": "只作为标签写进当前远程库的同步历史。",
+  "settings.device.placeholder": "我的设备",
+  "settings.history.name": "同步历史",
+  "settings.history.desc":
+    "本次运行期间的同步记录：发送了什么、应用了什么、哪些被设置跳过。只保存在内存里，重载插件后清空。",
+  "settings.history.view": "查看",
+  "settings.recycleBin.name": "回收站",
+  "settings.recycleBin.desc": "查看并恢复已删除的文件。",
+  "settings.recycleBin.descLocked": "继续同步并解锁远程库后，可以查看已删除的文件。",
+  "settings.recycleBin.view": "查看",
+  "settings.vaultPassword.name": "库密码",
+  "settings.vaultPassword.notStoredPaused": "未保存在这台设备：点「继续同步」时需要重新输入。",
+  "settings.vaultPassword.notStored": "未保存在这台设备：下次打开 Obsidian 需要重新输入。",
+  "settings.vaultPassword.storedPaused":
+    "已保存在这台设备；点「继续同步」时会自动解锁（不会随库同步）。",
+  "settings.vaultPassword.stored": "已保存在这台设备，重开 Obsidian 会自动解锁（不会随库同步）。",
+  "settings.vaultPassword.clear": "清除",
+  "settings.excludedFolders.list.name": "排除列表",
+  "settings.excludedFolders.list.descNone": "阻止某些文件夹被同步。",
+  "settings.excludedFolders.list.descCount.one": "当前已排除 {count} 个文件夹。",
+  "settings.excludedFolders.list.descCount.other": "当前已排除 {count} 个文件夹。",
+  "settings.excludedFolders.manage": "管理",
+  "settings.groupDescriptionWithReload": "{base}需重新加载 Obsidian 才能生效。",
+
+  // ── File type switches ──
+  "settings.fileType.images.label": "图片",
+  "settings.fileType.images.desc": "截图、插画等图片附件。",
+  "settings.fileType.audio.label": "音频",
+  "settings.fileType.audio.desc": "录音、音乐等音频附件。",
+  "settings.fileType.video.label": "视频",
+  "settings.fileType.video.desc": "视频附件。",
+  "settings.fileType.pdf.label": "PDF",
+  "settings.fileType.pdf.desc": "PDF 文档。",
+  "settings.fileType.otherTypes.label": "其他类型文件",
+  "settings.fileType.otherTypes.desc": "不属于以上类别的文件。",
+
+  // ── Obsidian settings groups ──
+  "settings.group.app.label": "主要设置",
+  "settings.group.app.desc": "app.json：编辑器、文件与链接等核心选项。",
+  "settings.group.appearance.label": "外观",
+  "settings.group.appearance.desc": "appearance.json：主题、字体与界面外观。",
+  "settings.group.themes.label": "主题文件",
+  "settings.group.themes.desc": "themes/ 中的主题 CSS 文件。",
+  "settings.group.snippets.label": "CSS 代码片段",
+  "settings.group.snippets.desc": "snippets/ 中的 CSS 片段。",
+  "settings.group.hotkeys.label": "快捷键",
+  "settings.group.hotkeys.desc": "hotkeys.json：自定义快捷键。",
+  "settings.group.corePlugins.label": "核心插件启用情况",
+  "settings.group.corePlugins.desc": "core-plugins.json：启用了哪些核心插件。",
+  "settings.group.corePluginSettings.label": "核心插件设置",
+  "settings.group.corePluginSettings.desc": "其他核心插件各自的配置文件。",
+  "settings.group.communityPluginList.label": "第三方插件启用情况",
+  "settings.group.communityPluginList.desc": "community-plugins.json：启用了哪些社区插件。",
+  "settings.group.communityPlugins.label": "已安装的社区插件",
+  "settings.group.communityPlugins.desc": "plugins/ 中的插件本体（main.js、样式、资源）。",
+  "settings.group.otherFiles.label": "配置文件夹中的其他文件",
+  "settings.group.otherFiles.desc": "配置文件夹中未归类的文件。",
+
+  // ── Password dialog ──
+  "dialog.password.title": "需要库密码",
+  "dialog.password.intro": "输入库密码，以便为文件同步启用加密。",
+  "dialog.password.label": "库密码",
+  "dialog.password.placeholder": "输入库密码",
+  "dialog.password.remember": "记住密码",
+  "dialog.password.rememberDesc":
+    "在这台设备上保存密钥，之后打开 Obsidian 会自动解锁（不会随库同步）。",
+  "dialog.password.unlock": "解锁",
+  "dialog.password.required": "需要输入密码。",
+
+  // ── Create vault dialog ──
+  "dialog.createVault.title": "创建远程库",
+  "dialog.createVault.name": "库名称",
+  "dialog.createVault.nameDesc": "给这个远程库起一个容易辨认的名称。",
+  "dialog.createVault.namePlaceholder": "我的远程库",
+  "dialog.createVault.password": "库密码",
+  "dialog.createVault.passwordDesc": "用于加密和校验远程库；密码不会发送到服务器。",
+  "dialog.createVault.passwordPlaceholder": "输入一个足够强的密码",
+  "dialog.createVault.create": "创建",
+  "dialog.createVault.nameRequired": "请填写库名称。",
+  "dialog.createVault.passwordRequired": "请填写库密码。",
+
+  // ── Vault picker ──
+  "dialog.vaultPicker.title": "选择远程库",
+  "dialog.vaultPicker.create": "创建远程库",
+  "dialog.vaultPicker.loading": "正在加载远程库…",
+  "dialog.vaultPicker.empty": "还没有远程库，先创建一个。",
+  "dialog.vaultPicker.deleteTooltip": "删除远程库",
+  "dialog.vaultPicker.connect": "连接",
+  "dialog.vaultPicker.deleteTitle": "删除「{vault}」",
+  "dialog.vaultPicker.deleteConfirm": "删除远程库「{vault}」？此操作不可撤销。",
+  "dialog.vaultPicker.wrongPassword": "库密码不正确，已取消删除。",
+  "dialog.vaultPicker.confirmTitle": "确认",
+  "dialog.vaultPicker.confirmCancel": "取消",
+  "dialog.vaultPicker.confirmOk": "确定",
+
+  // ── Connection setup dialog ──
+  "dialog.setup.title": "连接设置",
+  "dialog.setup.leadTitle": "连接到远程库",
+  "dialog.setup.subtitleConfigured": "检查并确认这个远程库的连接设置。",
+  "dialog.setup.subtitleNew": "选择这台设备同步这个远程库的方式。",
+  "dialog.setup.password": "库密码",
+  "dialog.setup.passwordDesc": "用于校验这个远程库；密码不会发送到服务器。",
+  "dialog.setup.passwordPlaceholder": "输入库密码",
+  "dialog.setup.remember": "记住密码",
+  "dialog.setup.rememberDesc":
+    "在这台设备上保存密钥，之后打开 Obsidian 会自动解锁（不会随库同步）。",
+  "dialog.setup.device": "设备名称",
+  "dialog.setup.deviceDesc": "只作为标签写进这个远程库的同步历史；每个远程库单独保存。",
+  "dialog.setup.devicePlaceholder": "我的设备",
+  "dialog.setup.folders": "排除的文件夹",
+  "dialog.setup.foldersNone": "不排除任何文件夹",
+  "dialog.setup.foldersCount.one": "已排除 {count} 个文件夹",
+  "dialog.setup.foldersCount.other": "已排除 {count} 个文件夹",
+  "dialog.setup.manage": "管理",
+  "dialog.setup.footerHint": "这些配置只保存在这台设备上。",
+  "dialog.setup.cancel": "取消",
+  "dialog.setup.start": "开始同步",
+  "dialog.setup.connecting": "正在连接…",
+  "dialog.setup.passwordRequired": "请输入库密码。",
+  "dialog.setup.connectFailed": "连接失败",
+
+  // ── Excluded folders dialog ──
+  "dialog.excludedFolders.title": "管理排除的文件夹",
+  "dialog.excludedFolders.empty": "这个库还没有文件夹。",
+  "dialog.excludedFolders.done": "完成",
+  "dialog.excludedFolders.missingTitle": "已删除的文件夹（仍被排除）",
+  "dialog.excludedFolders.missingHint": "重新创建同名文件夹后仍会继续排除。",
+  "dialog.excludedFolders.stopExcluding": "不再排除",
+  "dialog.excludedFolders.none": "当前没有排除任何文件夹。",
+  "dialog.excludedFolders.summary.one": "已排除 {count} 个文件夹；其内容不会同步。",
+  "dialog.excludedFolders.summary.other": "已排除 {count} 个文件夹；其内容不会同步。",
+  "dialog.excludedFolders.summaryWithMissing":
+    "已排除 {count} 个文件夹（其中 {missing} 个已删除）；其内容不会同步。",
+  "dialog.excludedFolders.saveFailed": "保存排除列表失败：{error}",
+
+  // ── Sync history dialog ──
+  // A log of **this run**: the engine's activity events, kept in memory. The header reads
+  // as one stat ("128 条同步记录") plus a note that it is this run's; each row is the
+  // direction arrow (no text), the path, and a muted line of time + device with the action
+  // word on the right. A skipped row adds the switch that fired, as it was at the time.
+  "dialog.syncHistory.title": "同步历史",
+  "dialog.syncHistory.countLabel.one": "条同步记录",
+  "dialog.syncHistory.countLabel.other": "条同步记录",
+  "dialog.syncHistory.sessionNote": "本次运行",
+  "dialog.syncHistory.truncated": "本次运行 · 只显示最近 {shown} 条",
+  "dialog.syncHistory.today": "今天",
+  "dialog.syncHistory.yesterday": "昨天",
+  "dialog.syncHistory.meta": "{time} · {device}",
+  // The reasons a row can carry for a path this device left alone. Each names the setting
+  // that owns the rule, because "已排除" alone does not tell anyone where to look.
+  "dialog.syncHistory.skipReason.folder": "这个文件夹被排除",
+  "dialog.syncHistory.skipReason.fileType": "这类文件未开启同步",
+  "dialog.syncHistory.skipReason.settingsGroup": "这组 Obsidian 设置未开启",
+  "dialog.syncHistory.skipReason.size": "超过这个账号的大小上限",
+  "dialog.syncHistory.skipReason.pathTooLong": "路径过长，服务器无法接受",
+  "dialog.syncHistory.notApplied": "本设备未应用：{reason}",
+  "dialog.syncHistory.notSent": "未发送：{reason}",
+  "dialog.syncHistory.directionOut": "来自这台设备",
+  "dialog.syncHistory.directionIn": "来自其他设备",
+  "dialog.syncHistory.peerUnknown": "其他设备",
+  "dialog.syncHistory.emptyTitle": "本次运行还没有同步记录",
+  "dialog.syncHistory.emptyDesc":
+    "这次运行中的发送、接收和因设置被跳过的文件会实时记在这里。记录只保存在内存里，重载插件后清空。",
+  "dialog.syncHistory.disconnectedTitle": "未连接远程库",
+  "dialog.syncHistory.disconnectedDesc": "连接一个远程库后，这里会显示本次运行的同步记录。",
+
+  // ── Version history ──
+  "dialog.versionHistory.loadError": "无法加载版本历史：{error}",
+  "dialog.versionHistory.empty": "暂无版本记录。",
+  "dialog.versionHistory.countLabel.one": "{count} 个版本",
+  "dialog.versionHistory.countLabel.other": "{count} 个版本",
+  "dialog.versionHistory.current": "当前",
+  "dialog.versionHistory.deleteWarning": "删除记录，无法恢复",
+  "dialog.versionHistory.restore": "恢复",
+  "dialog.versionHistory.noKey": "无法解密：尚未绑定远程库密钥。",
+  "dialog.versionHistory.contentError": "无法获取或解密这个版本的内容。",
+  "dialog.versionHistory.restored": "已恢复到版本 {id}…",
+  "dialog.versionHistory.confirmTitle": "恢复版本",
+  "dialog.versionHistory.confirmText": "将把「{path}」的内容替换为该版本（{time}）。",
+  "dialog.versionHistory.confirmBody": "当前内容仍保留在版本历史中，可以再次恢复。",
+  "dialog.versionHistory.sizeEmpty": "无内容",
+
+  // ── The version history view ──
+  "versionHistory.viewTitle": "版本历史",
+  "versionHistory.noTarget": "这个标签没有记录要显示哪个文件的版本历史。",
+  "versionHistory.notConnected": "未连接远程库，无法读取版本历史。",
+  "versionHistory.loading": "正在读取版本记录…",
+  "versionHistory.refresh": "刷新",
+  "versionHistory.restore": "恢复此版本",
+  "versionHistory.mode.content": "完整内容",
+  "versionHistory.mode.diff": "差异",
+  "versionHistory.modeLabel": "显示方式",
+  "versionHistory.diffCaption": "与上一个版本（{time}）比较",
+  "versionHistory.diffFirst": "最早的版本：下面全部是新增内容",
+  "versionHistory.diffSame": "与上一个版本内容相同。",
+  "versionHistory.diffTooLarge": "内容太大，无法比较差异。",
+  "explorer.versionHistory": "版本历史",
+
+  // ── File content preview ──
+  "dialog.fileContent.kind.markdown": "Markdown",
+  "dialog.fileContent.kind.text": "文本",
+  "dialog.fileContent.kind.image": "图片",
+  "dialog.fileContent.kind.video": "视频",
+  "dialog.fileContent.kind.audio": "音频",
+  "dialog.fileContent.kind.binary": "二进制",
+  "dialog.fileContent.emptyTitle": "空文件",
+  "dialog.fileContent.emptyDesc": "这个版本没有任何内容。",
+  "dialog.fileContent.binaryTitle": "无法预览此文件",
+  "dialog.fileContent.binaryDesc": "这是二进制文件（PDF、压缩包、插件包等），无法在弹窗内预览。",
+  "dialog.fileContent.mediaTitle": "无法内联播放",
+  "dialog.fileContent.mediaDesc": "这个文件无法在此预览：当前环境不支持内联播放。",
+
+  // ── Recycle bin ──
+  "dialog.recycleBin.title": "回收站",
+  "dialog.recycleBin.refresh": "刷新回收站",
+  "dialog.recycleBin.footerHint": "清空后无法恢复",
+  "dialog.recycleBin.clear": "清空回收站",
+  "dialog.recycleBin.disconnected": "未连接远程库",
+  "dialog.recycleBin.loading": "正在加载回收站…",
+  "dialog.recycleBin.loadFailed": "无法加载回收站",
+  "dialog.recycleBin.countLabel.one": "个已删除文件",
+  "dialog.recycleBin.countLabel.other": "个已删除文件",
+  "dialog.recycleBin.emptyTitle": "回收站为空",
+  "dialog.recycleBin.emptyDesc": "删除的文件会显示在这里。",
+  "dialog.recycleBin.connectHint": "连接远程库后，这里会显示已删除的文件。",
+  "dialog.recycleBin.unknownPath": "[未知路径] {id}…",
+  "dialog.recycleBin.meta": "删除于 {time} · 由 {device}",
+  "dialog.recycleBin.viewContent": "查看文件内容",
+  "dialog.recycleBin.restore": "恢复",
+  "dialog.recycleBin.contentTitle": "文件内容",
+  "dialog.recycleBin.deletedAt": "删除于 {time}",
+  "dialog.recycleBin.byDevice": "由 {device}",
+  "dialog.recycleBin.contentError": "无法获取或解密这个文件的内容。",
+  "dialog.recycleBin.clearFailed": "清空回收站失败：{error}",
+  "dialog.recycleBin.clearConfirmTitle": "清空回收站",
+  "dialog.recycleBin.clearConfirmText.one": "将永久删除回收站中的 {count} 个文件及其历史版本。",
+  "dialog.recycleBin.clearConfirmText.other": "将永久删除回收站中的 {count} 个文件及其历史版本。",
+  "dialog.recycleBin.irreversible": "此操作不可撤销。",
+  "dialog.recycleBin.deletePermanently": "永久删除",
+  "dialog.recycleBin.warning.pruned": "⚠ 可恢复的版本已被清理，无法恢复",
+  "dialog.recycleBin.warning.pathUnknown": "⚠ 无法解密这个文件记录的路径，无法恢复",
+
+  // ── Conflict comparison ──
+  "dialog.conflictDiff.title": "对比冲突副本",
+  "dialog.conflictDiff.tooLarge": "文件过大，无法生成对比。",
+  "dialog.conflictDiff.unreadable": "「{name}」无法读取，无法对比。",
+  "dialog.conflictDiff.missingCopy":
+    "找不到这个冲突副本「{name}」：它可能已被删除或改名，无法对比。",
+  "dialog.conflictDiff.missingOriginal": "找不到原文件「{name}」：它可能已被改名或删除，无法对比。",
+  "dialog.conflictDiff.layout": "布局",
+  "dialog.conflictDiff.split": "并排",
+  "dialog.conflictDiff.unified": "统一",
+  "dialog.conflictDiff.replace": "用冲突副本替换当前文件",
+  "dialog.conflictDiff.restoreOriginal": "恢复为原文件",
+  "dialog.conflictDiff.added": "+{count}",
+  "dialog.conflictDiff.removed": "−{count}",
+  "dialog.conflictDiff.copyLegend": "冲突副本",
+  "dialog.conflictDiff.currentLegend": "当前文件",
+  "dialog.conflictDiff.empty": "这个对比没有记录要比较的文件，请从冲突副本重新打开。",
+
+  // ── Conflict replace ──
+  "dialog.conflictReplace.titleReplace": "用冲突副本替换当前文件",
+  "dialog.conflictReplace.titleRecreate": "恢复为原文件",
+  "dialog.conflictReplace.buttonReplace": "替换",
+  "dialog.conflictReplace.buttonRecreate": "恢复",
+  "dialog.conflictReplace.textReplace": "将用冲突副本覆盖「{path}」。",
+  "dialog.conflictReplace.textRecreate": "原文件不存在，将按冲突副本创建「{path}」。",
+  "dialog.conflictReplace.deleteCopy": "替换后删除冲突副本",
+  "dialog.conflictReplace.folderOccupied": "无法替换：「{path}」已被文件夹占用。",
+  "dialog.conflictReplace.noticeFailed":
+    "替换失败：无法读取冲突副本或写入「{path}」。没有任何文件被改动。",
+  "dialog.conflictReplace.noticeReplaced": "已用冲突副本替换「{path}」",
+  "dialog.conflictReplace.noticeCreated": "已按冲突副本创建「{path}」",
+  "dialog.conflictReplace.noticeCopyKept": "{verb}，冲突副本仍保留。",
+
+  // ── Conflict file actions ──
+  "conflict.action.diff.title": "对比冲突副本与原文件",
+  "conflict.action.replace.title": "用冲突副本替换当前文件",
+  "conflict.action.diff.label": "对比",
+  "conflict.action.replace.label": "替换",
+
+  // ── Conflict notices ──
+  "conflict.notice.one": "检测到冲突",
+  "conflict.notice.many": "检测到 {count} 处冲突",
+  "conflict.notice.noLocal": "{head}：采用远程版本，本地没有需要保留的内容。",
+  "conflict.notice.parkedOne": "{head}：采用远程版本，本地修改已保存为「{path}」。",
+  "conflict.notice.parkedMany":
+    "{head}：采用远程版本，本地修改已保存为 {count} 个冲突副本（例如「{path}」）。",
+  "conflict.notice.tooLargeOne": "文件超过同步大小上限",
+  "conflict.notice.tooLargeMany": "{count} 个文件超过同步大小上限",
+  "conflict.notice.tooLargeNames":
+    "{head}，已跳过：{names}{more}。该上限由管理员按密钥设置，请联系管理员调整。",
+  "conflict.notice.tooLargeMore": " 等",
+  "conflict.notice.fileName": "「{path}」（{size}）",
+
+  // ── Sync history / time ──
+  "history.action.create": "创建",
+  "history.action.modify": "修改",
+  "history.action.rename": "重命名",
+  "history.action.delete": "删除",
+  "history.action.restore": "恢复",
+  "history.relative.justNow": "刚刚",
+  "history.relative.minutes.one": "{count} 分钟前",
+  "history.relative.minutes.other": "{count} 分钟前",
+  "history.relative.hours.one": "{count} 小时前",
+  "history.relative.hours.other": "{count} 小时前",
+  "history.relative.days.one": "{count} 天前",
+  "history.relative.days.other": "{count} 天前",
+  "history.relative.months.one": "{count} 个月前",
+  "history.relative.months.other": "{count} 个月前",
+  "history.relative.years.one": "{count} 年前",
+  "history.relative.years.other": "{count} 年前",
+  "history.createdAgo": "创建于 {relative}",
+  "history.deviceUnknown": "未知设备",
+
+  // ── Settings reload ──
+  "reload.title": "设置已同步",
+  "reload.message": "其他设备修改的 Obsidian 设置已同步到本机，重新加载后才会生效。",
+  "reload.reload": "重新加载",
+  "reload.dismiss": "稍后",
+
+  // ── Restore flow ──
+  "restore.title": "恢复文件",
+  "restore.occupied": "「{path}」已经被其他文件占用。",
+  "restore.hint": "请为恢复的文件换一个文件名。",
+  "restore.folder": "恢复后的文件会放在「{dir}/」下。",
+  "restore.root": "恢复后的文件会放在库根目录。",
+  "restore.nameLabel": "新文件名",
+  "restore.nameRequired": "请填写文件名。",
+  "restore.nameSlash": "文件名不能包含「/」；要换目录，恢复后再移动即可。",
+  "restore.nameOutOfScope": "这个文件名不在这台设备的同步范围内，其他设备不会收到它。请换一个。",
+  "restore.nameTaken": "这个文件名也已经被占用，请再换一个。",
+  "restore.failedOccupied": "无法恢复：{path} 已被另一个文件占用。",
+  "restore.failedUnsynced": "无法恢复：{path} 已有未同步的本地文件。",
+  "restore.failed": "恢复失败：{error}",
+
+  // ── Status bar and its menu ──
+  "status.state.notConnected": "未连接",
+  "status.state.notSynced": "未同步",
+  "status.state.syncing": "正在同步",
+  "status.state.waiting": "外部同步服务正在同步",
+  "status.state.paused": "暂停同步",
+  "status.tooltip": "Courier：{state}",
+  "status.tooltipVault": "Courier：{state}「{vault}」",
+  "status.tooltipFirstSync": "Courier：首次同步 — 已完成 {done} / {total} 个文件",
+  "status.tooltipFirstSyncVault": "Courier：首次同步 — 已完成 {done} / {total} 个文件「{vault}」",
+  "status.menu.accountUnavailable": "无法读取账号信息",
+  "status.menu.settings": "设置",
+  "status.value.expiry.never": "永不过期",
+  "status.value.expiry.expired": "已过期",
+  "status.value.expiry.unknown": "未知",
+  "status.value.expiry.days.one": "剩余 {count} 天",
+  "status.value.expiry.days.other": "剩余 {count} 天",
+  "status.value.storage.ratio": "{used}/{limit}",
+  "status.value.storage.unlimited": "{used} / 无上限",
+  "status.value.storage.unknown": "读取失败",
+
+  // ── File menu ──
+  "menu.versionHistory": "Courier 版本历史",
+} as const;
+
+/** Every plugin message key, derived from the Chinese catalog. */
+export type PluginMessageKey = keyof typeof zh;

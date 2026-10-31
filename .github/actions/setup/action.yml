@@ -1,0 +1,16 @@
+name: Setup workspace
+description: Install the pinned Bun runtime, then the workspace dependencies.
+
+# One pin for the repository: `.bun-version` is what `oven-sh/setup-bun` reads and
+# what `packageManager` in package.json names. A bump is one line.
+runs:
+  using: composite
+  steps:
+    - name: Install Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: .bun-version
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile

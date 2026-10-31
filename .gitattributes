@@ -1,0 +1,37 @@
+# Auto detect text files and normalize to LF
+* text=auto
+
+# Code files - use LF explicitly for cross-platform consistency
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.go text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.sql text eol=lf
+
+# Generated files
+*routeTree.gen.ts text eol=lf
+*tsconfig.tsbuildinfo binary
+*snapshot.json text eol=lf
+
+# Lock files
+pnpm-lock.yaml text eol=lf
+Cargo.lock text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

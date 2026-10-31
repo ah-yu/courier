@@ -1,0 +1,17 @@
+{
+  "name": "@courier/engine",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@courier/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@courier/testing": "workspace:*"
+  }
+}

@@ -1,0 +1,269 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Check version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: Check tag and package versions
+        id: check
+        run: |
+          set -euo pipefail
+          version="$(bun scripts/check-release.ts "$GITHUB_REF_NAME")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: Verify
+        run: bun run verify
+
+      - name: Check formatting
+        run: bun run verify format
+
+  server:
+    name: Build server binaries
+    needs: [preflight, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      # `bun build --compile` cross-compiles: it downloads the target's Bun
+      # runtime and embeds it. The three assets are the published convention.
+      - name: Build compiled binaries
+        run: bun run --filter @courier/server build:exe
+
+      - name: Generate release manifest
+        run: bun run --filter @courier/server manifest -- --notes "Release $GITHUB_REF_NAME"
+
+      - name: Smoke-test and checksum
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd packages/server/build
+          for asset in courier-server-linux-x64 courier-server-darwin-arm64 courier-server-win-x64.exe; do
+            test -s "$asset"
+            sha256sum "$asset" > "$asset.sha256"
+          done
+          chmod +x courier-server-linux-x64
+          version="$(./courier-server-linux-x64 version --json | bun -e 'console.log(JSON.parse(require("fs").readFileSync(0, "utf8")).version)')"
+          test "$version" = "$VERSION"
+          bun -e 'const m = require("./courier-server-manifest.json"); if (m.version !== process.env.VERSION) process.exit(1)'
+
+          # The only artifact that can prove the generated migration chain made it
+          # into the compiled bundle: the test suite runs the source, never this
+          # file. A build that lost the chain would still answer "up to date".
+          tmpdir="$(mktemp -d)"
+          SQLITE_PATH="$tmpdir/courier.db" ./courier-server-linux-x64 migrate
+          bun -e '
+            const { Database } = require("bun:sqlite");
+            const db = new Database(process.argv[1]);
+            const applied = db.query("SELECT COUNT(*) AS n FROM courier_migrations").get().n;
+            const core = db.query("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = ? AND name = ?").get("table", "api_keys").n;
+            if (applied < 1 || core !== 1) process.exit(1);
+          ' "$tmpdir/courier.db"
+          second="$(SQLITE_PATH="$tmpdir/courier.db" ./courier-server-linux-x64 migrate 2>&1)"
+          printf '%s\n' "$second" | grep -q "All migrations up to date"
+          SQLITE_PATH="$tmpdir/dry.db" ./courier-server-linux-x64 migrate --dry-run > /dev/null 2>&1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          path: |
+            packages/server/build/courier-server-linux-x64
+            packages/server/build/courier-server-linux-x64.sha256
+            packages/server/build/courier-server-darwin-arm64
+            packages/server/build/courier-server-darwin-arm64.sha256
+            packages/server/build/courier-server-win-x64.exe
+            packages/server/build/courier-server-win-x64.exe.sha256
+            packages/server/build/courier-server-manifest.json
+
+  cli:
+    name: Build CLI binaries
+    needs: [preflight, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: Build compiled binaries
+        run: bun run --filter @courier/cli build:exe
+
+      - name: Smoke-test and checksum
+        run: |
+          set -euo pipefail
+          cd packages/cli/build
+          for asset in courier-cli-linux-x64 courier-cli-darwin-arm64 courier-cli-win-x64.exe; do
+            test -s "$asset"
+            sha256sum "$asset" > "$asset.sha256"
+          done
+          chmod +x courier-cli-linux-x64
+          ./courier-cli-linux-x64 --help > /dev/null
+
+      - name: Generate release manifest
+        run: bun run --filter @courier/cli manifest -- --notes "Release $GITHUB_REF_NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          path: |
+            packages/cli/build/courier-cli-linux-x64
+            packages/cli/build/courier-cli-linux-x64.sha256
+            packages/cli/build/courier-cli-darwin-arm64
+            packages/cli/build/courier-cli-darwin-arm64.sha256
+            packages/cli/build/courier-cli-win-x64.exe
+            packages/cli/build/courier-cli-win-x64.exe.sha256
+            packages/cli/build/courier-cli-manifest.json
+
+  plugin:
+    name: Build Obsidian plugin
+    needs: [preflight, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: Build plugin bundle
+        run: bun run --filter @courier/plugin build
+
+      - name: Ensure zip is available
+        run: |
+          if ! command -v zip > /dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y zip
+          fi
+
+      - name: Stage release assets
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -s packages/plugin/dist/main.js
+          test -s packages/plugin/manifest.json
+          test -s packages/plugin/styles.css
+          rm -rf release-assets
+          mkdir -p release-assets
+          cp packages/plugin/dist/main.js release-assets/main.js
+          cp packages/plugin/manifest.json release-assets/manifest.json
+          cp packages/plugin/styles.css release-assets/styles.css
+          plugin_id="$(bun -p "require('./packages/plugin/manifest.json').id")"
+          mkdir -p "release-assets/plugin/$plugin_id"
+          cp release-assets/main.js release-assets/manifest.json release-assets/styles.css "release-assets/plugin/$plugin_id/"
+          (cd release-assets/plugin && zip -r "../courier-plugin-$VERSION.zip" "$plugin_id")
+          rm -rf release-assets/plugin
+          test -s "release-assets/courier-plugin-$VERSION.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            release-assets/main.js
+            release-assets/manifest.json
+            release-assets/styles.css
+            release-assets/courier-plugin-*.zip
+
+  release:
+    name: Publish GitHub release
+    needs: [preflight, server, cli, plugin]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify assets and build checksums
+        run: |
+          set -euo pipefail
+          for asset in \
+            courier-server-linux-x64 courier-server-linux-x64.sha256 \
+            courier-server-darwin-arm64 courier-server-darwin-arm64.sha256 \
+            courier-server-win-x64.exe courier-server-win-x64.exe.sha256 \
+            courier-server-manifest.json \
+            courier-cli-linux-x64 courier-cli-linux-x64.sha256 \
+            courier-cli-darwin-arm64 courier-cli-darwin-arm64.sha256 \
+            courier-cli-win-x64.exe courier-cli-win-x64.exe.sha256 \
+            courier-cli-manifest.json \
+            main.js manifest.json styles.css; do
+            test -s "release-assets/$asset"
+          done
+          test -s "$(ls release-assets/courier-plugin-*.zip)"
+          cat release-assets/*.sha256 | sort > release-assets/checksums.txt
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          title="Courier v$VERSION"
+          prerelease=""
+          case "$TAG" in
+            *-*) prerelease="--prerelease" ;;
+          esac
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" release-assets/* --clobber
+            if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = "true" ]; then
+              gh release edit "$TAG" --draft=false
+            fi
+          else
+            gh release create "$TAG" --draft --title "$title" --generate-notes $prerelease
+            gh release upload "$TAG" release-assets/* --clobber
+            gh release edit "$TAG" --draft=false
+          fi
+          {
+            echo "## Released \`$TAG\`"
+            echo
+            echo "Release: $(gh release view "$TAG" --json url --jq .url)"
+            echo
+            gh release view "$TAG" --json assets --jq '.assets[].name' | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
