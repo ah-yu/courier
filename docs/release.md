@@ -63,6 +63,12 @@ value is a snapshot too, so a fresh clone is buildable; run the script before a 
 trace back to a commit. The form is valid semver, so `check-release.ts` (the three agree) still
 runs in CI. A real release replaces it with `X.Y.Z` by hand.
 
+A snapshot can also be distributed when a test build has to be downloaded: push a tag named after
+it, `v<snapshot>` (for example `v0.0.0-dev.20261031.c555f24`). The tag contains a hyphen, so
+`release.yml` publishes it as a **prerelease** and `releases/latest` keeps pointing at the last
+stable release. It is still not a release — the version says `0.0.0-dev.*` — so the tag, the
+release and the branch that carries it are throwaway; delete them once the build has been tested.
+
 ## Release procedure
 
 The three packages ship together under one product version:

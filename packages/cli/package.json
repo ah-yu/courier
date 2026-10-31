@@ -1,6 +1,6 @@
 {
   "name": "@courier/cli",
-  "version": "0.0.0-dev.20261031.196fa6c",
+  "version": "0.0.0-dev.20261031.c555f24",
   "private": true,
   "type": "module",
   "scripts": {
