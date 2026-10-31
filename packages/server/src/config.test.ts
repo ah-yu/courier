@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import path from "path";
 import { isBundledPath, resolveDataDir } from "./config";
 
 /**
@@ -17,14 +18,19 @@ function alwaysExists(): boolean {
 
 describe("the production data directory", () => {
   it("rejects the Linux virtual root even though it reports as existing", () => {
-    expect(resolveDataDir("/$bunfs/root", "/home/u/courier/courier", alwaysExists)).toBe(
-      "/home/u/courier",
-    );
+    expect(
+      resolveDataDir("/$bunfs/root", "/home/u/courier/courier", alwaysExists, path.posix.dirname),
+    ).toBe("/home/u/courier");
   });
 
   it("rejects the Windows virtual root", () => {
     expect(
-      resolveDataDir("B:\\~BUN\\root", "C:\\Users\\u\\courier\\courier.exe", alwaysExists),
+      resolveDataDir(
+        "B:\\~BUN\\root",
+        "C:\\Users\\u\\courier\\courier.exe",
+        alwaysExists,
+        path.win32.dirname,
+      ),
     ).toBe("C:\\Users\\u\\courier");
   });
 

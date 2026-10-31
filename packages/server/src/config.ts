@@ -26,9 +26,10 @@ export function resolveDataDir(
   metaDir: string,
   execPath: string,
   exists: (path: string) => boolean = existsSync,
+  dirnameOf: (path: string) => string = dirname,
 ): string {
   if (!isBundledPath(metaDir) && exists(metaDir)) return metaDir;
-  return dirname(execPath);
+  return dirnameOf(execPath);
 }
 
 function getExeDir(): string {
