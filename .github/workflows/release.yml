@@ -2,7 +2,10 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    # Any tag: `preflight` rejects one that is not a version. The leading `v` is
+    # optional — `0.1.1` and `v0.1.1` name the same release, and the directory
+    # reads the release whose tag equals the manifest version (no `v`).
+    tags: ["*"]
 
 permissions:
   contents: read
@@ -254,7 +257,7 @@ jobs:
           VERSION: ${{ needs.preflight.outputs.version }}
         run: |
           set -euo pipefail
-          title="Courier v$VERSION"
+          title="Courier $VERSION"
           prerelease=""
           case "$TAG" in
             *-*) prerelease="--prerelease" ;;
@@ -276,44 +279,6 @@ jobs:
             echo
             gh release view "$TAG" --json assets --jq '.assets[].name' | sed 's/^/- /'
           } >> "$GITHUB_STEP_SUMMARY"
-
-      # The Obsidian community directory requires a release tagged exactly with
-      # the manifest version (no product "v"), and reads main.js, manifest.json
-      # and styles.css from that release. A failure here is allowed: the product
-      # release is already published and the CNB mirror must still run.
-      - name: Publish the Obsidian version-tagged release
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.preflight.outputs.version }}
-        run: |
-          set -euo pipefail
-          case "$VERSION" in
-            *-*)
-              echo "Prerelease; skipping the Obsidian version-tagged release"
-              exit 0
-              ;;
-          esac
-          if gh release view "$VERSION" > /dev/null 2>&1; then
-            gh release upload "$VERSION" \
-              release-assets/main.js release-assets/manifest.json release-assets/styles.css \
-              --clobber
-          else
-            gh release create "$VERSION" \
-              release-assets/main.js release-assets/manifest.json release-assets/styles.css \
-              --target "$GITHUB_SHA" \
-              --title "Courier $VERSION" \
-              --notes "Obsidian community plugin release for Courier $VERSION. The product release (server and CLI) is v$VERSION." \
-              --latest=false
-          fi
-          # Keep the product release (vX.Y.Z) as releases/latest: the install
-          # scripts and the CNB latest alias depend on it.
-          gh release edit "$VERSION" --draft=false --prerelease=false --latest=false
-          latest="$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name)"
-          if [ "$latest" = "$VERSION" ]; then
-            echo "::error::the Obsidian version-tagged release became releases/latest"
-            exit 1
-          fi
 
   # Optional download mirror on cnb.cool (see docs/cnb-mirror.md). It is a
   # separate job so a CNB outage cannot fail the GitHub release; GitHub remains

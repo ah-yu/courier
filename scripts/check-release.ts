@@ -3,13 +3,13 @@
  * Guard the release version before CI and before anything is built.
  *
  * One GitHub release ships `@courier/server`, `@courier/cli` and
- * `@courier/plugin` together under one `vX.Y.Z` tag, so the version has to agree
- * everywhere it is written: the three package files, plus the repository-root
- * `manifest.json` that mirrors the plugin manifest for the Obsidian community
- * directory (the directory reads the manifest at the HEAD of the default branch).
- * Without an argument the script only checks that they agree with each other; with
- * a tag it also checks they equal that tag. This is the release preflight and a
- * plain CI step, so a version bump cannot land on one file alone.
+ * `@courier/plugin` together under one `X.Y.Z` tag (a leading `v` is accepted and
+ * ignored), so the version has to agree everywhere it is written: the three package
+ * files, plus the repository-root `manifest.json` that mirrors the plugin manifest for
+ * the Obsidian community directory (the directory reads the manifest at the HEAD of
+ * the default branch). Without an argument the script only checks that they agree with
+ * each other; with a tag it also checks they equal that tag. This is the release
+ * preflight and a plain CI step, so a version bump cannot land on one file alone.
  *
  * The root mirror is also held to the plugin manifest byte for byte (line endings
  * aside), and the plugin manifest is checked against the fields the community
@@ -17,10 +17,10 @@
  *
  * Usage:
  *   bun scripts/check-release.ts            # the versions agree and the mirror matches
- *   bun scripts/check-release.ts v0.1.0     # ... and they equal the tag
+ *   bun scripts/check-release.ts 0.1.0      # ... and they equal the tag (v0.1.0 works too)
  *
  * On success stdout carries only the version, so a workflow can capture it with
- * command substitution: `version=$(bun scripts/check-release.ts v0.1.0)`. Every
+ * command substitution: `version=$(bun scripts/check-release.ts 0.1.0)`. Every
  * other line goes to stderr.
  */
 import { readFileSync } from "fs";
@@ -85,10 +85,10 @@ function sameManifest(left, right) {
 
 const tag = process.argv[2];
 if (process.argv.length > 3) {
-  failures.push("expected at most one argument: an optional vX.Y.Z tag");
+  failures.push("expected at most one argument: an optional X.Y.Z tag");
 }
-if (tag !== undefined && !/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(tag)) {
-  failures.push(`"${tag}" is not a release tag in the form vX.Y.Z`);
+if (tag !== undefined && !/^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(tag)) {
+  failures.push(`"${tag}" is not a release tag in the form X.Y.Z`);
 }
 
 const server = readJson("packages/server/package.json");
@@ -163,7 +163,7 @@ if (plugin !== null) {
 }
 
 if (tag !== undefined) {
-  const tagVersion = tag.slice(1);
+  const tagVersion = tag.replace(/^v/, "");
   for (const [source, version] of usable) {
     if (version !== tagVersion) {
       failures.push(`${source}: version ${version} does not match tag ${tag} (${tagVersion})`);

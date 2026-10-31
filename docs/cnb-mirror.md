@@ -14,16 +14,16 @@ so the CNB manifests could not be used to verify a GitHub download or the other 
 also spends CNB build CPU (160 core-hours/month free) and still fetches Bun and npm from the
 internet. If the goal is a faster download, building again is the expensive way to get it.
 
-**Can only the GitHub release assets be mirrored — does the code have to move?**
+**Can only the GitHub release assets be mirrored 鈥?does the code have to move?**
 The assets do not need the source tree, but a CNB release is attached to a Git tag, and a tag is
 a ref in a CNB repository. The minimum is therefore a repository that holds the tag's commit. If
-that commit is the real release commit, its tree is on CNB too — pushing a tag publishes the
+that commit is the real release commit, its tree is on CNB too 鈥?pushing a tag publishes the
 source at that tag whether or not `main` is mirrored. Avoiding source entirely means creating the
 tag at a placeholder commit, which throws away the provenance between the binary and the commit
 it was built from.
 
 For an open-source project the useful answer is the cheap one: mirror the real refs one way
-(GitHub → CNB), and upload the GitHub-built assets as CNB release attachments. One build
+(GitHub 鈫?CNB), and upload the GitHub-built assets as CNB release attachments. One build
 pipeline, two download locations, identical `sha256` values.
 
 ## What is mirrored
@@ -90,7 +90,7 @@ https://cnb.cool/<repo>/-/releases/download/<tag>/<asset>
 so a version-pinned download is always available:
 
 ```text
-https://cnb.cool/ah-yu/courier/-/releases/download/v0.1.0/courier-cli-manifest.json
+https://cnb.cool/ah-yu/courier/-/releases/download/0.1.0/courier-cli-manifest.json
 ```
 
 For a one-command install the release job also maintains a `latest` alias release. It is updated
@@ -105,7 +105,7 @@ https://cnb.cool/ah-yu/courier/-/releases/download/latest/courier-cli-manifest.j
 
 The alias is a convention, not a CNB feature. Set the `CNB_LATEST_ALIAS` repository variable to
 `false` to skip the alias entirely. Only stable releases are mirrored: a tag containing a hyphen
-(`v0.1.0-rc.1`, `v0.0.0-dev.<date>.<sha>`) is a prerelease and the `cnb` job is skipped. While
+(`0.1.0-rc.1`, `0.0.0-dev.<date>.<sha>`) is a prerelease and the `cnb` job is skipped. While
 the alias is being updated its release is briefly a draft, so a reader sees the old channel or a
 404, never a new manifest beside an old binary. The current versioned plugin zip replaces the
 previous one; older zips are deleted from the alias.
@@ -120,13 +120,13 @@ alias, or twice that without it.
 1. Create a **public** repository at `https://cnb.cool/<group>/<repo>` (an empty repository is
    fine). Public visibility is required: the download route is anonymous.
 2. Create an access token at `https://cnb.cool/profile/token`:
-   - `repo-code: write` — Git client credentials, branches and commits (needed by the tag and
+   - `repo-code: write` 鈥?Git client credentials, branches and commits (needed by the tag and
      `main` pushes; `write` already includes read, and `default` is not enough);
-   - `repo-release: write` — create/update releases and upload attachments;
+   - `repo-release: write` 鈥?create/update releases and upload attachments;
    - scope it to that repository and set an expiry.
 3. In the GitHub repository settings, add:
-   - secret `CNB_TOKEN` — the token above, used by both workflows;
-   - variable `CNB_REPO` — `<group>/<repo>` without the `.git` suffix.
+   - secret `CNB_TOKEN` 鈥?the token above, used by both workflows;
+   - variable `CNB_REPO` 鈥?`<group>/<repo>` without the `.git` suffix.
 
    The workflows read the variable; with it unset they are skipped rather than failing.
 
@@ -159,7 +159,7 @@ irm https://cnb.cool/<repo>/-/git/raw/main/install.ps1 | iex
 
 Both scripts read `courier-cli-manifest.json` from the same base, so the checksum check still
 runs. `COURIER_CLI_RELEASE_URL` also accepts a pinned version:
-`https://cnb.cool/<repo>/-/releases/download/v0.1.0`.
+`https://cnb.cool/<repo>/-/releases/download/0.1.0`.
 
 Server deployment: set `COURIER_SERVER_RELEASE_URL` to the same base; the deployment appends
 `courier-server-manifest.json`.
@@ -206,12 +206,12 @@ or publish the redirected URL.
 The script is the only mover; it needs a token and the downloaded asset directory:
 
 ```bash
-gh release download v0.1.0 --dir cnb-assets
+gh release download 0.1.0 --dir cnb-assets
 read -rsp "CNB token: " CNB_TOKEN; echo
 export CNB_TOKEN
 bun scripts/cnb-mirror.ts \
-  --repo <group>/<repo> --tag v0.1.0 \
-  --target-sha "$(git rev-parse v0.1.0)" \
+  --repo <group>/<repo> --tag 0.1.0 \
+  --target-sha "$(git rev-parse 0.1.0)" \
   --assets cnb-assets \
   --no-make-latest
 ```
@@ -224,5 +224,5 @@ currently reports as latest, use `--make-latest --latest-tag latest`.
 
 ## Related
 
-- [release.md](release.md) — the GitHub release procedure, assets and checksums.
-- [cli.md](cli.md) — the install scripts and the `COURIER_CLI_RELEASE_URL` override.
+- [release.md](release.md) 鈥?the GitHub release procedure, assets and checksums.
+- [cli.md](cli.md) 鈥?the install scripts and the `COURIER_CLI_RELEASE_URL` override.

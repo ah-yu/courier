@@ -14,9 +14,9 @@
  * tag is created once by CNB and is a download channel, not a source ref).
  *
  * Usage:
- *   bun scripts/cnb-mirror.ts --repo ah-yu/courier --tag v0.1.0 \
+ *   bun scripts/cnb-mirror.ts --repo ah-yu/courier --tag 0.1.0 \
  *     --target-sha <sha> --assets ./cnb-assets --body-file notes.md \
- *     [--source-url https://github.com/.../releases/tag/v0.1.0] \
+ *     [--source-url https://github.com/.../releases/tag/0.1.0] \
  *     [--make-latest] [--latest-tag latest] [--dry-run]
  *
  * Environment:
