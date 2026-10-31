@@ -69,15 +69,67 @@ export function renewBeforeMs(expiresAtMs: number | null, nowMs: number): boolea
   return nowMs >= expiresAtMs - RENEW_BEFORE_MS;
 }
 
-/** The renewal decision for a PEM chain: unreadable counts as "needs issuing". */
-export function certificateNeedsIssue(certPem: string | null, now: number): boolean {
+/**
+ * The renewal decision for a PEM chain: unreadable counts as "needs issuing".
+ *
+ * With `identifier`, a chain issued for a different address counts too. The TLS
+ * state outlives a service deletion, so a certificate can outlive the address it
+ * was issued for; without this check the service would keep serving a
+ * certificate for the old address until it expired.
+ */
+export function certificateNeedsIssue(
+  certPem: string | null,
+  now: number,
+  identifier?: AcmeIdentifier,
+): boolean {
   if (!certPem) return true;
   try {
-    return renewBeforeMs(new crypto.X509Certificate(certPem).validToDate.getTime(), now);
+    const certificate = new crypto.X509Certificate(certPem);
+    if (identifier && !certificateMatches(certificate, identifier)) return true;
+    return renewBeforeMs(certificate.validToDate.getTime(), now);
   } catch {
     // A truncated or foreign file is not a certificate this process can serve.
     return true;
   }
+}
+
+/**
+ * Whether a chain is for the identifier this service answers for.
+ *
+ * The runtime's own matchers are preferred: `checkIP` compares canonical IPs (an
+ * IPv6 identifier may be written expanded while the SAN is compressed) and
+ * `checkHost` handles IDNA and wildcards. The rendered SAN text is only a
+ * fallback for a runtime without them; a certificate that lists no SAN at all
+ * cannot be for this address, so it does not match.
+ */
+function certificateMatches(
+  certificate: crypto.X509Certificate,
+  identifier: AcmeIdentifier,
+): boolean {
+  const checks = certificate as unknown as {
+    // Node answers a boolean; Bun answers the matched SAN text. Both are
+    // truthy exactly when the name is in the chain.
+    checkIP?: (ip: string) => string | boolean | undefined;
+    checkHost?: (host: string) => string | undefined;
+  };
+  try {
+    if (identifier.type === "ip" && typeof checks.checkIP === "function") {
+      return Boolean(checks.checkIP(identifier.value));
+    }
+    if (identifier.type === "dns" && typeof checks.checkHost === "function") {
+      return Boolean(checks.checkHost(identifier.value));
+    }
+  } catch {
+    // A value the matcher refuses (a malformed identifier) is not in the chain.
+    return false;
+  }
+  const names = certificate.subjectAltName;
+  if (!names) return false;
+  const wanted = `${identifier.type === "ip" ? "ip address" : "dns"}:${identifier.value}`;
+  return names
+    .toLowerCase()
+    .split(/\s*,\s*/)
+    .includes(wanted.toLowerCase());
 }
 
 /** The certificate a listener serves: a PEM chain and its private key. */
@@ -153,7 +205,7 @@ export class AcmeManager implements ChallengeSink {
 
   /** Whether a chain (or its absence) requires an issuance at `now`. */
   needsIssue(certPem: string | null, now: number): boolean {
-    return certificateNeedsIssue(certPem, now);
+    return certificateNeedsIssue(certPem, now, this.identifier);
   }
 
   /** The body to serve for a challenge token, or null when it is not in flight. */
