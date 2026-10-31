@@ -133,6 +133,30 @@ describe("the renewal window", () => {
     expect(certificateNeedsIssue(null, Date.now())).toBe(true);
     expect(certificateNeedsIssue("not a certificate", Date.now())).toBe(true);
   });
+
+  it("re-issues a chain that is for another address", () => {
+    // The fixture is issued for `IP:127.0.0.1` + `DNS:localhost`. The TLS state
+    // survives a service deletion, so the address can change without the files
+    // changing: the certificate on disk then has to lose to the address the
+    // service answers for.
+    const now = 1_700_000_000_000;
+    expect(certificateNeedsIssue(FIXTURE_CERT, now, { type: "ip", value: "127.0.0.1" })).toBe(
+      false,
+    );
+    expect(certificateNeedsIssue(FIXTURE_CERT, now, { type: "ip", value: "203.0.113.9" })).toBe(
+      true,
+    );
+    expect(certificateNeedsIssue(FIXTURE_CERT, now, { type: "dns", value: "localhost" })).toBe(
+      false,
+    );
+    // The matcher is case-insensitive for DNS names, as a hostname comparison is.
+    expect(certificateNeedsIssue(FIXTURE_CERT, now, { type: "dns", value: "LocalHost" })).toBe(
+      false,
+    );
+    expect(certificateNeedsIssue(FIXTURE_CERT, now, { type: "dns", value: "example.com" })).toBe(
+      true,
+    );
+  });
 });
 
 describe("AcmeManager — the state on disk", () => {
@@ -147,6 +171,19 @@ describe("AcmeManager — the state on disk", () => {
     expect(manager.currentCertificate()).toEqual({ cert: FIXTURE_CERT, key: FIXTURE_KEY });
     await expect(manager.maybeIssue()).resolves.toBe(false);
     expect(issuer.requests).toHaveLength(0);
+  });
+
+  it("re-issues through the manager when the address changed", async () => {
+    // The pure decision is covered above; this pins that the manager actually
+    // asks it about its own identifier. Deleting that argument would leave a
+    // service serving the old address's certificate with a green test suite.
+    const dir = tempDir();
+    seed(dir, FIXTURE_CERT, FIXTURE_KEY);
+    const issuer = new FakeIssuer();
+    const manager = managerFor(dir, issuer, () => Date.now(), { name: "203.0.113.9" });
+
+    await expect(manager.maybeIssue()).resolves.toBe(true);
+    expect(issuer.requests).toHaveLength(1);
   });
 
   it("treats a chain/key pair that does not match as absent and issues instead", async () => {

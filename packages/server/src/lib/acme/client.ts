@@ -407,9 +407,17 @@ export class AcmeClient implements AcmeCertificateIssuer {
    * POST one JWS-signed request.
    *
    * Two different failures are retried, because both are expected of a real
-   * client: a `badNonce` or a rate limit (RFC 8555 §6.5 — a nonce can expire
-   * between two requests), and a connection that died before answering (a
-   * request the network dropped is not an ACME answer, and nothing was decided).
+   * client: a `badNonce` or a short `Retry-After` (RFC 8555 §6.5 — a nonce can
+   * expire between two requests, and a throttle can ask for a second), and a
+   * connection that died before answering (a request the network dropped is not
+   * an ACME answer, and nothing was decided).
+   *
+   * A rate limit that outlasts this order is not retried. "Too many certificates
+   * for this address" is the authority's decision, not a transient throttle:
+   * sleeping out the order's budget and then reporting "the order exceeded its
+   * budget" is exactly how a certificate limit ends up looking like a network
+   * problem. The authority's `Retry-After` (RFC 8555 §6.6) and its problem detail
+   * are both thrown instead, so the caller can say when to try again.
    */
   private async signedPost(
     url: string,
@@ -457,8 +465,23 @@ export class AcmeClient implements AcmeCertificateIssuer {
       if (response.ok) return response;
 
       const problem = await readProblem(response);
+      const rateLimited = isRateLimited(problem, response.status);
+      if (rateLimited) {
+        const requested = retryAfterMs(response.headers.get("retry-after"), this.nowFn());
+        const remaining = deadline - this.nowFn();
+        // `>=`: at equality the wait would run exactly to the deadline, and the
+        // send after it would report "the order exceeded its budget" — the
+        // sentence this branch exists to replace.
+        if (requested !== null && requested >= remaining) {
+          const at = new Date(this.nowFn() + requested).toISOString().replace("T", " ");
+          const retryAt = at.replace(/\.\d{3}Z$/, " UTC");
+          throw new Error(
+            `the ACME server rate limited this request (retry after ${retryAt}): ${problemText(problem)}`,
+          );
+        }
+      }
       if (isRetryable(problem, response.status) && attempt < MAX_RETRIES) {
-        await this.waitBeforeRetry(response, attempt, deadline);
+        await this.waitBeforeRetry(response, attempt, deadline, rateLimited);
         continue;
       }
       throw new Error(
@@ -547,23 +570,22 @@ export class AcmeClient implements AcmeCertificateIssuer {
     response: Response,
     attempt: number,
     deadline: number,
+    rateLimited: boolean,
   ): Promise<void> {
     let delay = Math.min(
       this.pollInterval() * 2 ** attempt,
       this.options.maxPollIntervalMs ?? DEFAULT_MAX_POLL_INTERVAL_MS,
     );
-    const header = response.headers.get("retry-after");
-    if (header) {
-      const seconds = Number(header);
-      const requested = Number.isFinite(seconds)
-        ? seconds * 1_000
-        : Date.parse(header) - this.nowFn();
-      if (Number.isFinite(requested) && requested >= 0) delay = Math.max(delay, requested);
-    }
+    const requested = retryAfterMs(response.headers.get("retry-after"), this.nowFn());
+    if (requested !== null) delay = Math.max(delay, requested);
     const remaining = deadline - this.nowFn();
     if (remaining <= 0) {
+      // Only a real rate limit carries the marker; this path also waits out
+      // badNonce and 503 answers, where calling it a rate limit would be wrong.
       throw new Error(
-        `the ACME server rate limited this request and the ${this.timeout()}ms budget is spent`,
+        rateLimited
+          ? `the ACME server rate limited this request and the ${this.timeout()}ms budget is spent`
+          : `the ACME server kept refusing this request and the ${this.timeout()}ms budget is spent`,
       );
     }
     await this.sleepFn(Math.min(delay, remaining));
@@ -623,6 +645,28 @@ function isRetryable(problem: AcmeProblem, status: number): boolean {
     status === 429 ||
     status === 503
   );
+}
+
+/** A rate limit is the authority saying "not now", not a failed request. */
+function isRateLimited(problem: AcmeProblem, status: number): boolean {
+  return problem.type === ERROR_RATE_LIMITED || status === 429;
+}
+
+/**
+ * The delay a `Retry-After` header asks for, in milliseconds, or null.
+ *
+ * `now` is the client's clock, not `Date.now()`: the header may be an HTTP-date
+ * (RFC 9110 §10.2.3), and the deadline it is compared with runs on the injected
+ * clock — the two have to agree or a test clock or a simulated run measures the
+ * wait against a different moment than the budget.
+ */
+function retryAfterMs(header: string | null, now: number): number | null {
+  if (!header) return null;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const at = Date.parse(header);
+  if (!Number.isFinite(at)) return null;
+  return Math.max(0, at - now);
 }
 
 async function readJson<T>(response: Response, url: string): Promise<T> {

@@ -44,6 +44,8 @@ interface FakeOptions {
   badNonceOnNewOrder?: number;
   /** Answer the first N `newOrder` POSTs with 429 + `Retry-After: 5`. */
   rateLimitOnNewOrder?: number;
+  /** The `Retry-After` (seconds) those 429 answers carry. Defaults to 5. */
+  rateLimitRetryAfter?: string;
   /** Fail the http-01 authorization with this problem detail. */
   authorizationFailure?: string;
   /** Answer this many order polls with `processing` before the order is valid. */
@@ -230,7 +232,7 @@ class FakeAcme {
         429,
         { type: "urn:ietf:params:acme:error:rateLimited", detail: "too many orders" },
         true,
-        { "Retry-After": "5" },
+        { "Retry-After": this.options.rateLimitRetryAfter ?? "5" },
       );
       return;
     }
@@ -571,6 +573,66 @@ describe("AcmeClient", () => {
     // one-millisecond backoff the poll interval would otherwise produce.
     expect(sleeps).toContain(5_000);
     expect(fake.requestCount("/new-order")).toBe(2);
+  });
+
+  it("reads an HTTP-date Retry-After against the client's clock", async () => {
+    // RFC 9110 allows a date instead of seconds; the wait has to be measured
+    // against the clock the order's budget runs on.
+    const retryAt = new Date(Date.now() + 4_000).toUTCString();
+    const fake = await startFake({ rateLimitOnNewOrder: 1, rateLimitRetryAfter: retryAt });
+    const accountPem = accountKeyPem();
+    const identifier = { type: "ip", value: "127.0.0.1" } as const;
+    const sleeps: number[] = [];
+
+    await testClient(fake, accountPem, sleeps).obtainCertificate(
+      { identifier, csrDer: csrFor(identifier) },
+      challengeFiles,
+    );
+
+    const waited = sleeps.find((ms) => ms >= 1_000);
+    expect(waited).toBeDefined();
+    expect(waited!).toBeGreaterThan(2_000);
+    expect(waited!).toBeLessThanOrEqual(4_000);
+    expect(fake.requestCount("/new-order")).toBe(2);
+  });
+
+  it("fails on a rate limit that outlasts the order", async () => {
+    // A certificate limit says "retry after 2026-11-01 03:49:40 UTC", which is
+    // hours away. Sleeping it out would turn it into "the order exceeded its
+    // budget" — the one sentence that hides the real reason.
+    const fake = await startFake({ rateLimitOnNewOrder: 1, rateLimitRetryAfter: "39724" });
+    const accountPem = accountKeyPem();
+    const identifier = { type: "ip", value: "127.0.0.1" } as const;
+    const sleeps: number[] = [];
+
+    await expect(
+      testClient(fake, accountPem, sleeps).obtainCertificate(
+        { identifier, csrDer: csrFor(identifier) },
+        challengeFiles,
+      ),
+    ).rejects.toThrow(
+      /rate limited this request \(retry after \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC\): too many orders/,
+    );
+
+    expect(sleeps).toEqual([]);
+    expect(fake.requestCount("/new-order")).toBe(1);
+  });
+
+  it("still retries a rate limit with no Retry-After", async () => {
+    // The header is what makes the limit "long": without one there is no time to
+    // compare against the budget, and the request gets the ordinary backoff.
+    const fake = await startFake({ rateLimitOnNewOrder: 1, rateLimitRetryAfter: "" });
+    const accountPem = accountKeyPem();
+    const identifier = { type: "ip", value: "127.0.0.1" } as const;
+    const sleeps: number[] = [];
+
+    await testClient(fake, accountPem, sleeps).obtainCertificate(
+      { identifier, csrDer: csrFor(identifier) },
+      challengeFiles,
+    );
+
+    expect(fake.requestCount("/new-order")).toBe(2);
+    expect(sleeps.length).toBeGreaterThan(0);
   });
 
   it("polls the order while it is processing", async () => {
