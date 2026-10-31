@@ -78,30 +78,10 @@ describe("runMigrations", () => {
     expect(hasTable(sqlite, "api_keys")).toBe(false);
   });
 
-  it("names a pre-release database instead of re-running the chain over it", () => {
-    // A database migrated before the name ledger still records hashes in
-    // `__drizzle_migrations`; without the preflight it would look unmigrated and
-    // die on `CREATE TABLE api_keys` with no explanation.
-    const sqlite = database();
-    sqlite.exec("CREATE TABLE __drizzle_migrations (hash TEXT PRIMARY KEY, created_at TEXT)");
-    sqlite.prepare("INSERT INTO __drizzle_migrations (hash) VALUES ('old')").run();
-
-    expect(() => runMigrations(sqlite)).toThrowError(/predates the migration ledger/);
-    expect(hasTable(sqlite, "api_keys")).toBe(false);
-  });
-
-  it("does not mistake an empty old ledger for a migrated database", () => {
-    const sqlite = database();
-    sqlite.exec("CREATE TABLE __drizzle_migrations (hash TEXT PRIMARY KEY, created_at TEXT)");
-
-    expect(runMigrations(sqlite)).toBe(MIGRATIONS.length);
-    expect(recordedNames(sqlite)).toHaveLength(MIGRATIONS.length);
-  });
-
   it("names the migration that failed and rolls only that one back", () => {
     const sqlite = database();
-    // `vaults` is the third table the first migration creates: its first two
-    // statements run, the third fails, and the rollback must undo the two.
+    // The baseline creates `vaults` last: every statement before it runs, that one
+    // fails, and the rollback must undo the earlier tables.
     sqlite.exec("CREATE TABLE `vaults` (`id` text PRIMARY KEY)");
 
     let failure: Error | undefined;
@@ -111,10 +91,10 @@ describe("runMigrations", () => {
       failure = error as Error;
     }
 
-    expect(failure?.message).toContain("migration 20260629162902_adorable_rattler failed");
+    expect(failure?.message).toContain(`migration ${MIGRATIONS[0]!.name} failed`);
     expect(failure?.message).toContain("already exists");
     expect(recordedNames(sqlite)).toEqual([]);
-    // The two tables the migration had already created are gone with it.
+    // The tables the migration had already created are gone with it.
     expect(hasTable(sqlite, "api_keys")).toBe(false);
     expect(hasTable(sqlite, "file_versions")).toBe(false);
   });

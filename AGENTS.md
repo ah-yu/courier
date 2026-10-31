@@ -115,7 +115,7 @@ bun run typecheck            # tsc --noEmit in every package + the tooling scrip
 # Server database
 bun run --filter @courier/server migrations:generate   # after adding drizzle/*/migration.sql
 bun run --filter @courier/server migrate                # apply the chain to the dev database
-bun run --filter @courier/server db:generate            # author a migration (needs a TTY)
+bun run --filter @courier/server db:generate            # author a migration from schema.ts
 bun run --filter @courier/server db:studio
 
 # Plugin and e2e fixtures

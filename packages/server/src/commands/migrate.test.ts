@@ -101,13 +101,4 @@ describe("runMigrate", () => {
 
     await expect(migrate()).rejects.toThrow(/does not know.*from_the_future.*upgrade/s);
   });
-
-  it("refuses a pre-release database whose history is the old hash table", async () => {
-    withDatabase((sqlite) => {
-      sqlite.exec("CREATE TABLE __drizzle_migrations (hash TEXT PRIMARY KEY, created_at TEXT)");
-      sqlite.prepare("INSERT INTO __drizzle_migrations (hash) VALUES ('old')").run();
-    });
-
-    await expect(migrate()).rejects.toThrow(/predates the migration ledger/);
-  });
 });

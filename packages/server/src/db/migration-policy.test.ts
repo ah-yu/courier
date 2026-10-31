@@ -17,8 +17,8 @@ import { sortedCopy } from "@courier/shared";
  *
  * A change that genuinely cannot be additive is still a real migration; it must be
  * recorded in `EXPLICIT_EXCEPTIONS` with its reason, so a destructive statement is a
- * deliberate decision rather than something that slips in silently. The two entries
- * below predate this list and are kept as history.
+ * deliberate decision rather than something that slips in silently. The chain starts
+ * from one baseline migration, so the list is empty.
  *
  * `CREATE TABLE`, `CREATE INDEX`, `ADD COLUMN`, `INSERT` and `UPDATE` need no
  * exception; `DROP`, `RENAME`, `DELETE` and other column surgery do.
@@ -31,10 +31,7 @@ const ALLOWED_STATEMENT =
  * reason, and the list is asserted to match real directories, so it cannot rot.
  * Adding one is the explicit path for a change that cannot be additive.
  */
-const EXPLICIT_EXCEPTIONS = new Map([
-  ["20260714000000_rename_key_hash", "规则生效前：api_keys.key_hash 改名为 key"],
-  ["20260717000000_key_check_canary", "规则生效前：删除验证哈希两列，新增 key_check"],
-]);
+const EXPLICIT_EXCEPTIONS = new Map<string, string>([]);
 
 function drizzleDir(): string {
   return fileURLToPath(new URL("../../drizzle", import.meta.url));

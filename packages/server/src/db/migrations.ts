@@ -21,8 +21,6 @@ import { MIGRATIONS } from "./migrations.generated";
  */
 
 const LEDGER = "courier_migrations";
-/** The pre-release ledger this design replaced; only its existence is inspected. */
-const LEGACY_LEDGER = "__drizzle_migrations";
 const STATEMENT_SEPARATOR = "--> statement-breakpoint";
 
 /** One migration, as the generated chain describes it. */
@@ -70,34 +68,16 @@ export function unknownMigrationNames(sqlite: Database): string[] {
 /**
  * Refuse a database this build must not migrate, before anything is written.
  *
- * Two states are named here instead of surfacing as a SQLite error three
- * statements later:
- *
- *   - the ledger holds names this binary does not carry — the database was
- *     migrated by a newer build, and this one must not run an older chain over
- *     it;
- *   - the ledger is missing but the pre-release `__drizzle_migrations` table has
- *     rows — that database would look unmigrated and re-run `CREATE TABLE
- *     api_keys`. It has to be recreated (this project is pre-release: there is
- *     nothing to preserve).
+ * The one state named here instead of surfacing as a SQLite error three
+ * statements later: the ledger holds names this binary does not carry — the
+ * database was migrated by a newer build, and this one must not run an older
+ * chain over it.
  */
 export function assertMigratable(sqlite: Database): void {
   const unknown = unknownMigrationNames(sqlite);
   if (unknown.length > 0) {
     throw new Error(
       `the database has migrations this build does not know (${unknown.join(", ")}); upgrade the binary`,
-    );
-  }
-
-  if (!hasTable(sqlite, LEGACY_LEDGER) || recordedNames(sqlite).size > 0) return;
-  const legacy = sqlite.prepare(`SELECT COUNT(*) AS n FROM ${LEGACY_LEDGER}`).get() as {
-    n: number;
-  };
-  if (legacy.n > 0) {
-    throw new Error(
-      "this database predates the migration ledger (`courier_migrations`) and still records hashes " +
-        "in `__drizzle_migrations`; delete the database file and run the migration again " +
-        "(pre-release: there is no data to preserve)",
     );
   }
 }
