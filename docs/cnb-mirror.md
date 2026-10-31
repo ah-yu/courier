@@ -28,7 +28,9 @@ pipeline, two download locations, identical `sha256` values.
 
 ## What is mirrored
 
-`release.yml` publishes these assets; the mirror uploads every one of them unchanged:
+Only a **stable** release is mirrored; a tag containing a hyphen is a prerelease and is skipped.
+For a stable release, `release.yml` publishes these assets and the mirror uploads every one of them
+unchanged:
 
 | Asset                                                                                                       | Consumer                             |
 | ----------------------------------------------------------------------------------------------------------- | ------------------------------------ |
@@ -102,10 +104,11 @@ https://cnb.cool/ah-yu/courier/-/releases/download/latest/courier-cli-manifest.j
 ```
 
 The alias is a convention, not a CNB feature. Set the `CNB_LATEST_ALIAS` repository variable to
-`false` to skip the alias entirely. Prereleases (`v0.1.0-rc.1`) are mirrored as CNB prereleases
-and never touch `latest`. While the alias is being updated its release is briefly a draft, so a
-reader sees the old channel or a 404, never a new manifest beside an old binary. The current
-versioned plugin zip replaces the previous one; older zips are deleted from the alias.
+`false` to skip the alias entirely. Only stable releases are mirrored: a tag containing a hyphen
+(`v0.1.0-rc.1`, `v0.0.0-dev.<date>.<sha>`) is a prerelease and the `cnb` job is skipped. While
+the alias is being updated its release is briefly a draft, so a reader sees the old channel or a
+404, never a new manifest beside an old binary. The current versioned plugin zip replaces the
+previous one; older zips are deleted from the alias.
 
 The alias doubles the stored copy of each release. The free object-storage allowance is 100 GiB
 for artifacts, LFS objects, images and attachments. A release is roughly 600 MiB (six compiled
@@ -193,7 +196,7 @@ or publish the redirected URL.
 | no remote hash, or a hash/size mismatch                       | the script downloads and hashes the asset; any mismatch fails the job                                |
 | the job fails mid-upload                                      | the version release stays a draft (or the alias stays hidden); re-run the job                        |
 | an older release is re-run                                    | the alias and CNB's latest flag stay with the newest release; only that version's release is updated |
-| prerelease tag                                                | mirrored as a CNB prerelease; `latest` is not touched                                                |
+| prerelease tag                                                | not mirrored; the `cnb` job is skipped                                                               |
 | object-storage quota exhausted                                | the upload fails; prune old releases or disable the alias                                            |
 | repository renamed or made private                            | the anonymous download URLs break; update `CNB_REPO` and the documentation                           |
 | a release is edited after publication                         | re-run the `cnb` job (or run the script manually)                                                    |

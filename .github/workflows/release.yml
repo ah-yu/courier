@@ -279,7 +279,9 @@ jobs:
   cnb:
     name: Mirror to CNB
     needs: [release]
-    if: vars.CNB_REPO != ''
+    # Only stable releases are mirrored. A tag containing a hyphen is a
+    # prerelease (release candidate or snapshot build) and is skipped here.
+    if: vars.CNB_REPO != '' && !contains(github.ref_name, '-')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
