@@ -14,6 +14,7 @@
 | Document                                                      | Status          | Purpose                                                                                                                                              |
 | ------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`AGENTS.md`](../AGENTS.md)                                   | `authoritative` | Project intro + agent operating contract: policies, commands, cross-package invariants; details point to `docs/`. **Read before changing anything.** |
+| [`docs/quick-start.md`](quick-start.md)                       | `authoritative` | User quick start: run a server, create a user key, install the plugin, connect a vault, add a second device                                          |
 | [`docs/agent-safety.md`](agent-safety.md)                     | `authoritative` | Destructive operations on Windows, macOS and Linux: hard rules, safe deletion, shell traps, sandbox/approval exceptions                              |
 | [`docs/sync-engine.md`](sync-engine.md)                       | `authoritative` | Sync engine rules: decisions, conflicts, tombstones, conditional push, offline/reconcile, hosts, restore                                             |
 | [`docs/sync-scope.md`](sync-scope.md)                         | `authoritative` | Device sync scope, file types, excluded folders, config-folder settings groups, size cap                                                             |
@@ -35,6 +36,7 @@
 ## Division of labour
 
 - **`AGENTS.md` is the agent operating contract**: only the policies, commands, cross-package invariants and document routing an agent must know before acting. No design history, per-file test inventories, UI pixel detail, or restated API/CLI contracts.
+- **The public entry point is the repository-root [`README.md`](../README.md).** It is the page the Obsidian community directory shows, so it carries the product introduction, the quick start link, the network/account disclosure and the license. This index stays the internal routing table for design and operations documents.
 - **Sync engine behaviour** lives in [`docs/sync-engine.md`](sync-engine.md) and [`docs/sync-scope.md`](sync-scope.md). **The executable spec is still `packages/engine/src/` and its `*.test.ts`**; when a document and the code disagree, the code is right and the document is the bug.
 - **Server** architecture and layering are in [`docs/server.md`](server.md), the HTTP/WebSocket contract in [`docs/api.md`](api.md); handler test patterns are in [`docs/testing.md`](testing.md).
 
@@ -42,6 +44,7 @@
 
 - REST / message-type changes → update [`docs/api.md`](api.md); CLI changes → update [`docs/cli.md`](cli.md); sync behaviour changes → update `docs/sync-engine.md` / `docs/sync-scope.md` and the matching tests.
 - **A behaviour change updates its owning document**: when code and document disagree, the code wins and the document is fixed to match. Never keep two versions of the same claim.
-- **`AGENTS.md` holds summaries only**: if a rule needs more than a few lines, put it in the owning document and link the anchor. `bun run check:docs` enforces `AGENTS.md ≤ 32 KiB`, that every document under `docs/` is listed here, and that every relative link and `#fragment` in `AGENTS.md` and `docs/` resolves; it is also a `bun run verify` gate.
+- **`AGENTS.md` holds summaries only**: if a rule needs more than a few lines, put it in the owning document and link the anchor. `bun run check:docs` enforces `AGENTS.md ≤ 32 KiB`, that every document under `docs/` is listed here, and that every relative link and `#fragment` in `AGENTS.md`, the repository-root `README.md` and `docs/` resolves; it is also a `bun run verify` gate.
+- **The Obsidian community directory reads the repository root**: `manifest.json` there is a verbatim copy of `packages/plugin/manifest.json` (the plugin manifest is the only one to edit; `bun scripts/check-release.ts` fails when the two differ), and `README.md` / `LICENSE` must stay at the root.
 - **Run `bun run verify` after every change**: one command gives the docs + migrations + lint + typecheck + test verdict.
 - New document → register its status here. When two documents contradict each other, **fix or delete one of them**; never keep both.

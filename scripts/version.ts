@@ -9,10 +9,15 @@
  * `0.0.0-dev.YYYYMMDD.<shortsha>` says "not a release, built from this commit on
  * this day", which is what a test build is.
  *
+ * The Obsidian community directory reads `manifest.json` at the repository root,
+ * so the plugin manifest is copied there verbatim after the version is written; the
+ * two files are never edited independently (`scripts/check-release.ts` fails when
+ * they differ).
+ *
  * The committed value is a snapshot too, so a fresh clone is buildable without
  * running this; run it before a test build to point the version at the current
- * commit. A release still bumps the three files to `X.Y.Z` by hand and tags it
- * (see `docs/release.md`).
+ * commit. A release still bumps the three package files to `X.Y.Z` by hand, copies
+ * the plugin manifest to the root mirror and tags it (see `docs/release.md`).
  *
  * Usage:
  *   bun run version:snapshot              # 0.0.0-dev.<today, UTC>.<git short sha>
@@ -69,5 +74,12 @@ for (const relativePath of VERSION_FILES) {
   document.version = version;
   writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`, "utf8");
 }
+
+/** The community directory's copy: a verbatim mirror, never a second version. */
+writeFileSync(
+  join(root, "manifest.json"),
+  readFileSync(join(root, "packages/plugin/manifest.json"), "utf8"),
+  "utf8",
+);
 
 console.log(version);

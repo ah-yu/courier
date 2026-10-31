@@ -51,7 +51,10 @@ Bun workspace for the sync solution.
 | `@courier/testing` | Test helpers shared by packages | TypeScript interfaces exported from `src/`; no build                |
 
 The release workflow publishes the server binaries, the CLI binaries and the Obsidian plugin from
-this repository (see `docs/release.md`).
+this repository (see `docs/release.md`). The repository root also carries the three files the
+Obsidian community directory reads — `manifest.json` (a verbatim mirror of
+`packages/plugin/manifest.json`), `README.md` and `LICENSE`; `scripts/check-release.ts` fails when
+the mirror and the plugin manifest differ.
 
 **Truth, by subject.** This table is the routing rule; `docs/README.md` registers every document
 and its status.
@@ -346,5 +349,7 @@ details and the full contract are in [testing.md](docs/testing.md#stub-fidelity)
   `noEmit`, so **`Bun.build` is the only writer of `packages/plugin/dist/`** (exactly `main.js`);
   the server builds with `tsc` only.
 - **Versions**: the three release packages carry one version, stamped by
-  `bun run version:snapshot` for test builds (`0.0.0-dev.YYYYMMDD.<shortsha>`); see
+  `bun run version:snapshot` for test builds (`0.0.0-dev.YYYYMMDD.<shortsha>`) and mirrored to the
+  repository-root `manifest.json` the Obsidian directory reads; `version:snapshot` writes all four
+  and `scripts/check-release.ts` fails when the mirror and the plugin manifest differ; see
   [docs/release.md](docs/release.md#snapshot-versions-for-test-builds).

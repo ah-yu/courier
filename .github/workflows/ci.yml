@@ -23,7 +23,7 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      - name: Check release versions
+      - name: Check release versions and the manifest mirror
         run: bun scripts/check-release.ts
 
       - name: Verify

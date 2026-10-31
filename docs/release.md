@@ -57,25 +57,31 @@ A test build is not a release, so it carries `0.0.0-dev.YYYYMMDD.<shortsha>`:
 bun run version:snapshot
 ```
 
-`scripts/version.ts` writes that value into the three files listed below, with the date in UTC and
-the current commit's short sha (the CI-provided revision when git is unavailable). The committed
-value is a snapshot too, so a fresh clone is buildable; run the script before a build you want to
-trace back to a commit. The form is valid semver, so `check-release.ts` (the three agree) still
-runs in CI. A real release replaces it with `X.Y.Z` by hand.
+`scripts/version.ts` writes that value into the three package files listed below and copies the
+plugin manifest to the repository-root `manifest.json`, with the date in UTC and the current
+commit's short sha (the CI-provided revision when git is unavailable). The committed value is a
+snapshot too, so a fresh clone is buildable; run the script before a build you want to trace back to
+a commit. The form is valid semver, so `check-release.ts` (the versions agree and the root mirror
+matches) still runs in CI. A real release replaces it with `X.Y.Z` by hand.
 
 ## Release procedure
 
-The three packages ship together under one product version:
+The three packages ship together under one product version, and the Obsidian community directory
+reads that version from a fourth file at the repository root:
 
 - `packages/server/package.json` → `version`
 - `packages/cli/package.json` → `version`
-- `packages/plugin/manifest.json` → `version`
+- `packages/plugin/manifest.json` → `version` (the canonical plugin manifest)
+- `manifest.json` (repository root) → a verbatim copy of the plugin manifest, because the directory
+  processes the manifest at the HEAD of the default branch
 
-`scripts/check-release.ts` enforces this. With no argument it checks the three agree (the CI
-step); with a tag it also checks they equal the tag (the release preflight). A mismatch fails before
-anything is built.
+`scripts/check-release.ts` enforces this: with no argument it checks the versions agree and the root
+mirror is identical to the plugin manifest (the CI step); with a tag it also checks they equal the
+tag (the release preflight). A mismatch fails before anything is built. The root copy is never
+edited by hand — copy the plugin manifest over it.
 
-1. Bump all three versions to the same value, for example `0.1.0` (replacing the snapshot).
+1. Bump all three package versions to the same value, for example `0.1.0` (replacing the snapshot),
+   and copy the plugin manifest to the root: `cp packages/plugin/manifest.json manifest.json`.
 2. Run `bun scripts/check-release.ts v0.1.0` and commit the bump.
 3. Tag and push:
 
@@ -86,7 +92,7 @@ anything is built.
 
 The tag push starts `.github/workflows/release.yml`, which:
 
-1. `preflight` validates the tag against the three versions and captures the version;
+1. `preflight` validates the tag against the four version files and captures the version;
 2. `verify` runs the same `bun run verify` and `bun run verify format` gates as CI;
 3. `server`, `cli` and `plugin` build in parallel;
 4. `release` downloads the three artifacts, checks every expected file, writes `checksums.txt`,
@@ -105,6 +111,30 @@ The release is created from the tag commit with generated release notes. Re-runn
 workflow is safe: a draft release is completed, and an existing release has its assets replaced with
 `--clobber`. A tag containing a hyphen (for example `v0.1.0-rc.1`) is published as a prerelease, so
 `releases/latest` keeps pointing at the latest stable release.
+
+### The Obsidian community directory
+
+The plugin is published from this repository, so the directory's rules are release rules:
+
+- **The files it reads must be at the repository root**: `README.md` (the public page whose excerpt
+  the listing shows), `LICENSE`, and `manifest.json` — the last one is a mirror, with the canonical
+  copy remaining at `packages/plugin/manifest.json`.
+- **Versions are `x.y.z` only.** The directory does not accept the snapshot form
+  (`0.0.0-dev.YYYYMMDD.<shortsha>`) or a prerelease tag such as `v0.1.0-rc.1`, and the GitHub
+  release tag must equal the manifest `version`. A snapshot build or a prerelease is for testing;
+  bump to a plain `X.Y.Z` before submitting a plugin release, and remember that the directory reads
+  the manifest at the default branch's HEAD, so the bump has to be committed first.
+- **The root manifest is a mirror, never a second source.** CI and the release preflight fail when
+  it differs from `packages/plugin/manifest.json`; the release assets are still staged from the
+  plugin manifest.
+- **Manifest fields the directory reviews** (`scripts/check-release.ts` pins the mechanical ones):
+  `id` is lowercase letters/digits/hyphens, unique across the directory, and neither ends with
+  `plugin` nor contains `obsidian`; `description` is at most 250 characters and ends with a period;
+  `minAppVersion` is the real minimum; `fundingUrl` exists only if the project accepts donations;
+  `isDesktopOnly` is `false` only when no Node.js or Electron API is used.
+- **The README carries the policy disclosures**: that an account on a self-hosted server is required
+  for full functionality, and where the plugin's network requests go. The linked usage guide is
+  [quick-start.md](quick-start.md).
 
 ### Manual smoke check (L4)
 
@@ -218,7 +248,8 @@ manifest does the same per platform.
 
 | Failure                                       | Result                                                                                       |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| tag does not match the three package versions | `preflight` fails; nothing is built or published                                             |
+| tag does not match the four version files     | `preflight` fails; nothing is built or published                                             |
+| the root manifest differs from the plugin one | `check-release` fails in CI and in `preflight`; nothing is built                             |
 | a gate fails (`bun run verify`, formatting)   | no build jobs start                                                                          |
 | a binary, manifest, bundle or zip is missing  | the artifact upload or the release job fails; no publication                                 |
 | an upload fails midway                        | the release stays a draft; re-run the workflow to finish it                                  |
