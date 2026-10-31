@@ -11,7 +11,7 @@
 ## Build
 
 - **Build tool is `Bun.build`** (`scripts/build.ts`), not esbuild. Output: single CJS `dist/main.js`; `obsidian`, `electron`, `@codemirror/*`, `@lezer/*` are external; `output.codeSplitting: false` keeps dynamic imports inlined into one file. The release build passes `--production` (minified, no sourcemap); a dev build keeps the inline map and copies into the vaults. `styles.css` is source, not build output: Obsidian loads it from the plugin folder, and the dev loop (`scripts/build.ts`), `setup:vault` and the e2e installer all copy it beside `main.js`.
-- `manifest.json` is the Obsidian plugin manifest (`isDesktopOnly: false`).
+- `manifest.json` is the Obsidian plugin manifest (`isDesktopOnly: false`), published as-is; the repository root keeps a verbatim mirror of it because the community directory reads that copy (`scripts/check-release.ts` keeps the two identical).
 
 ## Source layout and UI surfaces
 

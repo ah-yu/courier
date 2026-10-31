@@ -9,8 +9,9 @@
  *
  * Fragments are checked because they are the routing layer `AGENTS.md` uses: it sends a reader
  * to a named section of a document, so a renamed heading has to fail here rather than produce a
- * link that silently lands at the top of the page. The link scan covers `AGENTS.md` and every
- * document under `docs/`, not only the index.
+ * link that silently lands at the top of the page. The link scan covers `AGENTS.md`, the
+ * repository-root `README.md` the Obsidian community directory shows, and every document under
+ * `docs/`, not only the index.
  *
  * Run directly with `bun run check:docs`; it is also a default `bun run verify` gate.
  */
@@ -25,6 +26,7 @@ const failures = [];
 const agentsPath = join(root, "AGENTS.md");
 const docsDir = join(root, "docs");
 const indexPath = join(docsDir, "README.md");
+const readmePath = join(root, "README.md");
 const anchorCache = new Map();
 
 /** A repo-relative path with forward slashes, for messages. */
@@ -186,12 +188,13 @@ if (index !== null) {
 // --- links and fragments resolve -------------------------------------------
 
 /*
- * `AGENTS.md` routes a reader into `docs/`, so both the routing table's links and every
- * document's own links are scanned; a renamed file or heading fails here rather than in a
- * reader's browser.
+ * `AGENTS.md` routes a reader into `docs/`, and the repository-root `README.md` is the page
+ * the Obsidian community directory shows, so both are scanned beside every document's own
+ * links; a renamed file or heading fails here rather than in a reader's browser.
  */
-for (const path of [agentsPath, ...docs]) {
-  const text = path === agentsPath ? agents : readOrFail(path);
+const readme = readOrFail(readmePath);
+for (const path of [agentsPath, readmePath, ...docs]) {
+  const text = path === agentsPath ? agents : path === readmePath ? readme : readOrFail(path);
   if (text !== null) checkLinks(path, text);
 }
 if (index !== null) checkLinks(indexPath, index);
