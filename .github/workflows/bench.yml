@@ -127,6 +127,10 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
 
+      # The renderer is a Bun script and the runner image does not provide Bun; the
+      # action installs the runtime pinned in `.bun-version` from this same checkout.
+      - uses: ./.github/actions/setup
+
       - uses: actions/download-artifact@v4
         with:
           name: bench-results
