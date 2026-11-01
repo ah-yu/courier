@@ -1,3 +1,4 @@
+import { realPlatform } from "@courier/testing";
 import {
   existsSync,
   mkdirSync,
@@ -514,6 +515,7 @@ export async function createTestClient(options: CreateClientOptions): Promise<Te
   /** Everything the engine reported as applied or parked, in order. */
   const activities: SyncActivityEvent[] = [];
   const engine = new SyncEngine({
+    platform: realPlatform,
     vaultId: options.vaultId,
     adapter,
     api,

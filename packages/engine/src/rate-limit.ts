@@ -12,6 +12,7 @@
  * which class carries it. `status === 429` is the HTTP fact; `code` covers a host
  * that re-wraps the error.
  */
+import type { Platform } from "./platform";
 
 /** How long to wait when the server refused without saying for how long. */
 export const DEFAULT_RATE_LIMIT_WAIT_MS = 61_000;
@@ -47,7 +48,15 @@ export function rateLimitWaitMs(err: unknown): number {
   return DEFAULT_RATE_LIMIT_WAIT_MS;
 }
 
-/** Resolve after `ms`, for a pass that has to wait out a limiter window. */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Resolve after `ms`, for a pass that has to wait out a limiter window.
+ *
+ * The default `wait` of a `SyncEngine` (see `withRateLimitWaits`); a host that can stop
+ * mid-wait supplies its own, and a host with a non-standard runtime supplies the
+ * `Platform` this schedules on.
+ */
+export function sleep(ms: number, platform: Platform): Promise<void> {
+  return new Promise((resolve) => {
+    platform.after(ms, resolve);
+  });
 }

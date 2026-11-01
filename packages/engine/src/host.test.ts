@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { waitFor, stubGlobal, advanceTimersByTimeAsync, restoreGlobals } from "@courier/testing";
+import {
+  waitFor,
+  stubGlobal,
+  advanceTimersByTimeAsync,
+  restoreGlobals,
+  realPlatform,
+} from "@courier/testing";
 import { sortedCopy } from "@courier/shared";
 import {
   PUSH_NOTIFICATION_FLUSH_MS,
@@ -145,6 +151,7 @@ async function newHost(overrides: Partial<SyncHostOptions> = {}): Promise<{
   const api = fakeApi();
   const events = fakeEventSource();
   const host = new SyncHost({
+    platform: realPlatform,
     vaultId: "vault-1",
     encryptionKey: await makeKey(),
     adapter: new FakeAdapter(),
@@ -353,6 +360,7 @@ describe("SyncHost", () => {
     const onBindFailed = vi.fn();
     const events = fakeEventSource();
     const host = new SyncHost({
+      platform: realPlatform,
       vaultId: "vault-1",
       encryptionKey: await makeKey(),
       adapter: new FakeAdapter(),
@@ -389,6 +397,7 @@ describe("SyncHost", () => {
     });
     api.getVaultSyncIndex = failing;
     const host = new SyncHost({
+      platform: realPlatform,
       vaultId: "vault-1",
       encryptionKey: await makeKey(),
       adapter: new FakeAdapter(),
@@ -431,6 +440,7 @@ describe("SyncHost", () => {
     });
     api.getVaultSyncIndex = failing;
     const host = new SyncHost({
+      platform: realPlatform,
       vaultId: "vault-1",
       encryptionKey: await makeKey(),
       adapter: new FakeAdapter(),

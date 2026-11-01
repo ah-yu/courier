@@ -1,4 +1,5 @@
 import type { ApiErrorCode, WsServerMessage } from "@courier/shared";
+import type { Platform, TimerHandle } from "./platform";
 
 export type WsConnectionState = "disconnected" | "connecting" | "connected" | "error";
 
@@ -30,6 +31,13 @@ export interface SyncWebSocketOptions {
    */
   deviceName: string;
   onEvent: WsEventHandler;
+  /**
+   * The runtime this socket runs on (see `Platform`).
+   *
+   * Required, so this module holds no ambient reference of its own; the host that
+   * builds the socket passes the one it was given.
+   */
+  platform: Platform;
 }
 
 /**
@@ -44,13 +52,17 @@ export class SyncWebSocket {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectDelay = 30_000;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private lastMessageTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectTimer: TimerHandle | null = null;
+  private lastMessageTimer: TimerHandle | null = null;
   private state: WsConnectionState = "disconnected";
   private manualDisconnect = false;
   private sessionId: string | null = null;
 
-  constructor(private opts: SyncWebSocketOptions) {}
+  private readonly platform: Platform;
+
+  constructor(private opts: SyncWebSocketOptions) {
+    this.platform = opts.platform;
+  }
 
   private setState(state: WsConnectionState): void {
     if (this.state === state) return;
@@ -222,22 +234,22 @@ export class SyncWebSocket {
     if (this.reconnectTimer !== null) return;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), this.maxReconnectDelay);
     this.reconnectAttempts++;
-    this.reconnectTimer = setTimeout(() => {
+    this.reconnectTimer = this.platform.after(delay, () => {
       this.reconnectTimer = null;
       this.connect();
-    }, delay);
+    });
   }
 
   private clearReconnectTimer(): void {
     if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer.cancel();
       this.reconnectTimer = null;
     }
   }
 
   private resetLastMessageTimer(): void {
     this.clearLastMessageTimer();
-    this.lastMessageTimer = setTimeout(() => {
+    this.lastMessageTimer = this.platform.after(60_000, () => {
       if (this.state === "connected" && this.ws) {
         try {
           this.ws.close();
@@ -245,12 +257,12 @@ export class SyncWebSocket {
           // ignore
         }
       }
-    }, 60_000);
+    });
   }
 
   private clearLastMessageTimer(): void {
     if (this.lastMessageTimer !== null) {
-      clearTimeout(this.lastMessageTimer);
+      this.lastMessageTimer.cancel();
       this.lastMessageTimer = null;
     }
   }

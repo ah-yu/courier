@@ -21,6 +21,7 @@
  * Env: `BENCH_SCENARIO`, `BENCH_FILES`, `BENCH_CHURN_FILES`, `BENCH_LARGE_MIB`,
  * `BENCH_RUN_ID`, `BENCH_RESULTS_DIR`, `BENCH_TMP`.
  */
+import { realPlatform } from "@courier/testing";
 
 import assert from "assert/strict";
 import { createHash } from "crypto";
@@ -631,6 +632,7 @@ function createBenchClient(options: {
   const progress = { done: 0, total: 0, calls: 0 };
   const tooLarge: Array<{ plainPath: string; sizeBytes: number }> = [];
   const engine = new SyncEngine({
+    platform: realPlatform,
     vaultId: options.vaultId,
     adapter,
     api,

@@ -85,6 +85,7 @@ class MemoryLeaseStore implements SyncLeaseStore {
 
 function twoLeases(store: MemoryLeaseStore, now: () => number) {
   const first = new SyncLease({
+    process,
     store,
     owner: "cli",
     token: "cli-token",
@@ -93,6 +94,7 @@ function twoLeases(store: MemoryLeaseStore, now: () => number) {
     host: HOST,
   });
   const second = new SyncLease({
+    process,
     store,
     owner: "plugin",
     token: "plugin-token",
@@ -219,6 +221,7 @@ describe("SyncLease", () => {
     }
     const failing: SyncLeaseStore = new FailingStore(() => now);
     const lease = new SyncLease({
+      process,
       store: failing,
       owner: "cli",
       token: "cli-token",
@@ -233,7 +236,7 @@ describe("SyncLease", () => {
 
   it("works with the production defaults (no token, clock or pid supplied)", async () => {
     const store = new MemoryLeaseStore(() => Date.now());
-    const lease = new SyncLease({ store, owner: "cli" });
+    const lease = new SyncLease({ store, owner: "cli", process });
     expect(await lease.acquire()).toBe(true);
     expect(lease.owned).toBe(true);
     await lease.release();
@@ -243,7 +246,7 @@ describe("SyncLease", () => {
     const store = new MemoryLeaseStore(() => Date.now());
     stubGlobal("crypto", {});
     try {
-      const lease = new SyncLease({ store, owner: "plugin" });
+      const lease = new SyncLease({ store, owner: "plugin", process });
       expect(await lease.acquire()).toBe(true);
       await lease.release();
     } finally {
@@ -254,7 +257,13 @@ describe("SyncLease", () => {
   it("does not remove an expired record that may already be taken over", async () => {
     let now = 1_000;
     const store = new MemoryLeaseStore(() => now);
-    const lease = new SyncLease({ store, owner: "cli", token: "cli-token", now: () => now });
+    const lease = new SyncLease({
+      store,
+      owner: "cli",
+      token: "cli-token",
+      now: () => now,
+      process,
+    });
     await lease.acquire();
     now += DEFAULT_LEASE_TTL_MS + 1;
 
@@ -272,7 +281,13 @@ describe("SyncLease", () => {
       }
     }
     const store = new HeartbeatWriteError(() => now);
-    const lease = new SyncLease({ store, owner: "cli", token: "cli-token", now: () => now });
+    const lease = new SyncLease({
+      store,
+      owner: "cli",
+      token: "cli-token",
+      now: () => now,
+      process,
+    });
 
     expect(await lease.acquire()).toBe(false);
     expect(await store.stat(".courier/sync-lease")).toBeNull();
@@ -287,7 +302,13 @@ describe("SyncLease", () => {
       }
     }
     const store = new HeartbeatReadError(() => now);
-    const lease = new SyncLease({ store, owner: "cli", token: "cli-token", now: () => now });
+    const lease = new SyncLease({
+      store,
+      owner: "cli",
+      token: "cli-token",
+      now: () => now,
+      process,
+    });
 
     expect(await lease.acquire()).toBe(true);
     expect(await readSyncLease(store)).toMatchObject({ token: "cli-token" });
@@ -299,7 +320,13 @@ describe("SyncLease", () => {
   it("does not delete a directory when the owner record is missing", async () => {
     let now = 1_000;
     const store = new MemoryLeaseStore(() => now);
-    const lease = new SyncLease({ store, owner: "cli", token: "cli-token", now: () => now });
+    const lease = new SyncLease({
+      store,
+      owner: "cli",
+      token: "cli-token",
+      now: () => now,
+      process,
+    });
     await lease.acquire();
     await store.removeFile(".courier/sync-lease/owner.json");
 
@@ -313,7 +340,13 @@ describe("SyncLease", () => {
   it("does not throw when the store cannot clean up or read its own record", async () => {
     let now = 1_000;
     const store = new MemoryLeaseStore(() => now);
-    const lease = new SyncLease({ store, owner: "cli", token: "cli-token", now: () => now });
+    const lease = new SyncLease({
+      store,
+      owner: "cli",
+      token: "cli-token",
+      now: () => now,
+      process,
+    });
     await lease.acquire();
 
     store.removeFile = async () => {
@@ -328,6 +361,7 @@ describe("SyncLease", () => {
     store.files.clear();
     store.dirs.clear();
     const second = new SyncLease({
+      process,
       store,
       owner: "plugin",
       token: "plugin-token",
@@ -379,12 +413,12 @@ describe("leaseIsCurrent", () => {
   const current = (
     lease: SyncLeaseInfo | null,
     now = NOW,
-    alive: (pid: number) => boolean = pidAlive,
+    alive: (pid: number) => boolean = (pid) => pidAlive(pid, process),
   ) => leaseIsCurrent(lease, now, alive, HOST);
 
   it("calls a record current while its process exists", () => {
-    expect(pidAlive(selfPID())).toBe(true);
-    expect(pidAlive(DEAD_PID)).toBe(false);
+    expect(pidAlive(selfPID(), process)).toBe(true);
+    expect(pidAlive(DEAD_PID, process)).toBe(false);
     // No pid: an environment that cannot answer. Not proof of death.
     expect(pidAlive(0)).toBe(true);
     expect(current(record({ pid: selfPID() }))).toBe(true);
@@ -403,7 +437,9 @@ describe("leaseIsCurrent", () => {
     delete anonymous.host;
     expect(current(anonymous)).toBe(true);
     // And a reader that cannot name itself does not judge anybody's pid.
-    expect(leaseIsCurrent(record({ pid: DEAD_PID }), NOW, pidAlive, "")).toBe(true);
+    expect(
+      leaseIsCurrent(record({ pid: DEAD_PID }), NOW, (pid) => pidAlive(pid, process), ""),
+    ).toBe(true);
   });
 
   it("treats a plugin record whose process is gone as stale too", () => {
@@ -429,6 +465,7 @@ describe("leaseIsCurrent", () => {
     );
 
     const next = new SyncLease({
+      process,
       store,
       owner: "cli",
       token: "cli-token",
@@ -450,6 +487,7 @@ describe("leaseIsCurrent", () => {
     );
 
     const next = new SyncLease({
+      process,
       store,
       owner: "cli",
       token: "cli-token",
@@ -474,6 +512,7 @@ describe("leaseIsCurrent", () => {
     );
 
     const next = new SyncLease({
+      process,
       store,
       owner: "plugin",
       token: "plugin-token",
@@ -492,6 +531,7 @@ describe("leaseIsCurrent", () => {
     await store.writeFile(LEASE_FILE, JSON.stringify(record({ pid: DEAD_PID, host: "the-nas" })));
 
     const next = new SyncLease({
+      process,
       store,
       owner: "plugin",
       token: "plugin-token",
@@ -512,6 +552,7 @@ describe("leaseIsCurrent", () => {
     await store.writeFile(LEASE_FILE, JSON.stringify(record({ pid: selfPID() })));
 
     const next = new SyncLease({
+      process,
       store,
       owner: "plugin",
       token: "plugin-token",

@@ -15,6 +15,7 @@ import {
   type UserSummary,
 } from "@courier/shared";
 import { resolveObsidianLocale, setLocale, t } from "./i18n";
+import { pluginPlatform } from "./platform";
 import { getServerUrl, getWsUrl, type PluginActions } from "./shared/api";
 import { createPluginActions } from "./shared/actions";
 import { exactBuffer } from "./shared/bytes";
@@ -1176,6 +1177,8 @@ export default class CourierPlugin extends Plugin {
       lease: new SyncLease({
         store: new AdapterLeaseStore(this.app.vault.adapter),
         owner: "plugin",
+        // The renderer's Node surface: pid evidence on desktop, absent on mobile.
+        process: pluginPlatform.process,
       }),
       onLeaseChange: () => this.refreshLiveState(),
     });

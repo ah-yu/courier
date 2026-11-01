@@ -1,4 +1,5 @@
 import type { EventRef, TAbstractFile, TFile, Vault } from "obsidian";
+import { pluginPlatform } from "../platform";
 import {
   LEASE_RENEW_MS,
   SyncHost,
@@ -310,6 +311,8 @@ export class EngineHost {
       api: this.opts.createSyncApi(userKey),
       wsUrl: this.opts.wsUrl,
       userKey,
+      // The renderer's runtime: window timers, and `process` on desktop only.
+      platform: pluginPlatform,
       // Read when the socket subscribes: a peer's notification names the label this
       // client had at that moment. The push path reads the setting per push.
       getDeviceName: () => this.opts.getSettings().deviceName,

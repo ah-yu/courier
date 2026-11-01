@@ -548,8 +548,12 @@ file now lives at.
   `user_key_revoked` while only logging "Sync stopped", and it hardcoded an exclusive weight instead of
   `weightForSize`. What a host still owns is what is genuinely host-specific: the event source
   (`SyncEventSource` — Obsidian's `vault.on`, or `fs.watch` coalesced and answered by reading the path),
-  the adapter, the state store (`data.json` vs `sync_state.json`), the network (`requestUrl` vs `fetch`)
-  and the log lines. `user_key_revoked` / `user_key_disabled` / `vault_deleted` stop the host **before**
+  the adapter, the state store (`data.json` vs `sync_state.json`), the network (`requestUrl` vs `fetch`),
+  the log lines and the `Platform` the timers and the lease's `process` probe schedule through. The
+  engine names no global of its own: the renderer creates timers on `window` and has `process` only on
+  desktop, Bun's timers are `unref`'d so an idle daemon can exit, and a runtime with no process table
+  (the plugin on mobile) leaves the lease deciding on expiry alone.
+  `user_key_revoked` / `user_key_disabled` / `vault_deleted` stop the host **before**
   reporting, on both clients. So does an **HTTP** `401`/`403` (`UNAUTHORIZED`, `KEY_EXPIRED`,
   `KEY_DISABLED`): a pass that fails on a dead credential used to be retried every pass, which left a
   client that looked like it was syncing while every request it made was refused. One callback,

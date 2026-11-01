@@ -22,6 +22,13 @@ import {
 } from "@courier/engine";
 import type { Vault } from "obsidian";
 
+// The plugin's platform is written for Obsidian's renderer, which owns a `window`; Bun,
+// where this suite runs, does not. Defining it here keeps production source honest — the
+// plugin never branches on the runtime it is on.
+if (typeof (globalThis as { window?: unknown }).window === "undefined") {
+  (globalThis as { window?: unknown }).window = globalThis;
+}
+
 // ── Fakes (plain injected objects — no module mocking, no real network) ──
 
 /**
@@ -269,6 +276,7 @@ describe("EngineHost", () => {
         store: cliHeldStore(now),
         owner: "plugin",
         token: "plugin-token",
+        process,
       });
       const waitStates: boolean[] = [];
       const settings = baseSettings({ connectedVaultId: "vault-1" });

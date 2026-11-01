@@ -35,6 +35,8 @@ function heldLease(): SyncLease {
     store: new LeaseStore(vaultPath),
     owner: "plugin",
     token: "plugin-token",
+    // A live holder writes a real pid, which is what the status path checks.
+    process,
   });
 }
 

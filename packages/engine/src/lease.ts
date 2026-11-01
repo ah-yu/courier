@@ -20,6 +20,8 @@
  * Obsidian's state is reporting context only, never a handoff rule.
  */
 
+import type { NodeSurface } from "./platform";
+
 export interface SyncLeaseStore {
   /** Create a directory and its parent, if needed. Existing directories are fine. */
   ensureDir(path: string): Promise<void>;
@@ -64,10 +66,19 @@ export interface SyncLeaseOptions {
   now?: () => number;
   /** Test token; production leaves it unset. */
   token?: string;
-  /** Test pid; production uses `process.pid` when the runtime provides it. */
+  /** Test pid; production uses the runtime's `process.pid` when it provides one. */
   pid?: number;
   /** This machine's name, recorded in `owner.json`. A host with an OS should pass its own. */
   host?: string;
+  /**
+   * The Node surface of the runtime this lease runs on (`Platform.process`).
+   *
+   * Required, and `undefined` is a meaningful value — the plugin on mobile has no process
+   * table, and then only the TTL decides whether a record is current. It is required so a
+   * host cannot *forget* it: an omitted surface degrades exactly like a missing one, and a
+   * contender would then wait out the whole TTL for a holder that is already gone.
+   */
+  process: NodeSurface | undefined;
 }
 
 /** The lease directory, relative to the vault root; a dot directory is out of sync. */
@@ -95,9 +106,8 @@ export const LEASE_RENEW_MS = 5_000;
  * for the plugin, whose renderer may only have the environment it inherited. An empty
  * answer is not a failure: it just means pid evidence cannot be used here.
  */
-export function currentHost(): string {
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
-    ?.env;
+export function currentHost(node?: NodeSurface): string {
+  const env = node?.env;
   return (env?.COMPUTERNAME ?? env?.HOSTNAME ?? "").trim();
 }
 
@@ -110,13 +120,11 @@ export function currentHost(): string {
  * the claim standing, because wrongly declaring a live holder dead is the one outcome that
  * puts two writers in one vault.
  */
-export function pidAlive(pid: number): boolean {
+export function pidAlive(pid: number, node?: NodeSurface): boolean {
   if (pid <= 0) return true;
-  const host = (globalThis as { process?: { kill?: (pid: number, signal: number) => boolean } })
-    .process;
-  if (typeof host?.kill !== "function") return true;
+  if (typeof node?.kill !== "function") return true;
   try {
-    host.kill(pid, 0);
+    node.kill(pid, 0);
     return true;
   } catch (err) {
     return (err as { code?: string } | null)?.code !== "ESRCH";
@@ -147,9 +155,15 @@ export function pidAlive(pid: number): boolean {
  */
 export function leaseIsCurrent(
   lease: SyncLeaseInfo | null,
-  now: number = Date.now(),
-  alive: (pid: number) => boolean = pidAlive,
-  host: string = currentHost(),
+  now: number,
+  /**
+   * Whether a pid is a live process **on this machine**. Required, and built from the
+   * caller's `NodeSurface`: a default would have to read a global, and a caller that
+   * forgot it would silently answer "alive" for every record.
+   */
+  alive: (pid: number) => boolean,
+  /** This machine's name; empty when the runtime cannot say, which skips the pid check. */
+  host: string,
 ): boolean {
   if (!lease || lease.expiresAt <= now) return false;
   if (lease.pid <= 0) return true;
@@ -216,15 +230,18 @@ export class SyncLease {
   private readonly token: string;
   private readonly pid: number;
   private readonly host: string;
+  /** The Node surface of the runtime this lease runs on, when it has one. */
+  private readonly node: NodeSurface | undefined;
   private held = false;
   private acquiredAt = 0;
 
   constructor(private readonly opts: SyncLeaseOptions) {
     this.ttlMs = opts.ttlMs ?? DEFAULT_LEASE_TTL_MS;
     this.now = opts.now ?? (() => Date.now());
-    this.token = opts.token ?? defaultToken(opts.owner);
-    this.pid = opts.pid ?? defaultPID();
-    this.host = opts.host ?? currentHost();
+    this.node = opts.process;
+    this.token = opts.token ?? defaultToken(opts.owner, this.node);
+    this.pid = opts.pid ?? defaultPID(this.node);
+    this.host = opts.host ?? currentHost(this.node);
   }
 
   /** Whether this instance currently believes it owns the lease. */
@@ -247,7 +264,9 @@ export class SyncLease {
         this.acquiredAt = Date.parse(existing.acquiredAt) || this.now();
         return this.renew();
       }
-      if (leaseIsCurrent(existing, this.now(), pidAlive, this.host)) return false;
+      if (leaseIsCurrent(existing, this.now(), (pid) => pidAlive(pid, this.node), this.host)) {
+        return false;
+      }
       if (!existing) {
         // A directory without a readable owner record is either a just-created lease
         // whose owner has not written yet, or a corrupt/stale one. Its mtime decides:
@@ -363,12 +382,16 @@ export class SyncLease {
 }
 
 /** A token unique to this process/host. */
-function defaultToken(owner: SyncLeaseOwner): string {
-  const random = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
-  return `${owner}-${defaultPID()}-${random}`;
+function defaultToken(owner: SyncLeaseOwner, node?: NodeSurface): string {
+  // `crypto` is a Web-platform global in both runtimes, and `randomUUID` needs a secure
+  // context — which Obsidian's renderer and Bun both are. The fallback covers a
+  // `randomUUID` that is missing, not a missing `crypto`: naming it unqualified is what
+  // keeps this module free of `globalThis`.
+  const random = crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
+  return `${owner}-${defaultPID(node)}-${random}`;
 }
 
-function defaultPID(): number {
-  const pid = (globalThis as { process?: { pid?: number } }).process?.pid;
+function defaultPID(node?: NodeSurface): number {
+  const pid = node?.pid;
   return typeof pid === "number" ? pid : 0;
 }

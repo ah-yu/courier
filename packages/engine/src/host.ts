@@ -18,6 +18,7 @@ import {
   type SyncScope,
   type SyncScopeInput,
 } from "./sync-scope";
+import type { Platform, TimerHandle } from "./platform";
 import { SyncWebSocket, type WsConnectionState, type WsEvent } from "./websocket";
 
 /**
@@ -88,22 +89,22 @@ export function isEmptyState(json: string): boolean {
  * already inside a pass — so the one part of that work that is idle has to be
  * interruptible, or a stopped host (and the vault lease it holds) waits it out.
  */
-function waitForAbort(ms: number, signal: AbortSignal): Promise<void> {
+function waitForAbort(ms: number, signal: AbortSignal, platform: Platform): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
       reject(new Error("the host stopped while waiting out the rate limit"));
       return;
     }
     const cancel = (): void => {
-      clearTimeout(timer);
+      timer.cancel();
       signal.removeEventListener("abort", cancel);
       reject(new Error("the host stopped while waiting out the rate limit"));
     };
-    const timer = setTimeout(() => {
+    const timer = platform.after(ms, () => {
       signal.removeEventListener("abort", cancel);
       resolve();
-    }, ms);
-    (timer as unknown as { unref?: () => void }).unref?.();
+    });
+    timer.unref?.();
     signal.addEventListener("abort", cancel, { once: true });
   });
 }
@@ -232,6 +233,16 @@ export interface SyncHostOptions {
   getPriorityPaths?: () => readonly string[];
   eventSource: SyncEventSource;
   stateStore: SyncStateStore;
+  /**
+   * The runtime this host runs on (see `Platform`).
+   *
+   * Required: the host that builds a `SyncHost` says which runtime it is on, so no timer
+   * and no `process` probe on the sync path depends on the ambient one. (`WebSocket`,
+   * `console` and `Date.now` are still the runtime's — the port is about the two things
+   * that differ in behaviour between the plugin and the CLI, not about sealing the
+   * engine off from the platform.)
+   */
+  platform: Platform;
   /** Full-reconcile interval in ms; `0` disables the periodic pass. */
   reconcileIntervalMs?: number;
   /** Settings-poll interval in ms; `0` disables the poll. */
@@ -325,8 +336,8 @@ export class SyncHost {
   private engineInstance: SyncEngine | null = null;
   private ws: SyncWebSocket | null = null;
   private stopEvents: (() => void) | null = null;
-  private reconcileTimer: ReturnType<typeof setInterval> | null = null;
-  private settingsTimer: ReturnType<typeof setInterval> | null = null;
+  private reconcileTimer: TimerHandle | null = null;
+  private settingsTimer: TimerHandle | null = null;
   private reconciling = false;
   /** Background jobs started from events, reconciles or settings polls. */
   private background = 0;
@@ -341,13 +352,13 @@ export class SyncHost {
   /** `file_pushed` notifications waiting for the next batched chain pull. */
   private pendingPushes: PushedFileEvent[] = [];
   /** The short timer that flushes {@link pendingPushes}; `null` when none is scheduled. */
-  private pushFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  private pushFlushTimer: TimerHandle | null = null;
   /** True once the socket has been subscribed at least once — see `handleWsEvent`. */
   private socketHasConnected = false;
   /** True while the last settings poll failed, so an outage is reported once. */
   private settingsPollFailed = false;
   /** A retry scheduled because a bind pass failed (see `scheduleBindRetry`). */
-  private bindRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private bindRetryTimer: TimerHandle | null = null;
   /** The delay the next failed-bind retry uses; doubles up to the periodic interval. */
   private bindRetryMs = BIND_RETRY_INITIAL_MS;
   /** True between `stop()` and the next `start()`, so a late callback is ignored. */
@@ -372,6 +383,11 @@ export class SyncHost {
   private readonly scope: SyncScope;
   private readonly opLimits: OpQueueLimits;
   private readonly ops: OpQueue;
+
+  /** The runtime this host was given (see `SyncHostOptions.platform`). */
+  private get platform(): Platform {
+    return this.opts.platform;
+  }
 
   constructor(private readonly opts: SyncHostOptions) {
     this.scope = normalizeScope(opts.syncScope);
@@ -468,6 +484,7 @@ export class SyncHost {
       // Read once per socket: a peer's notification names the label this client had
       // when it subscribed.
       deviceName: this.opts.getDeviceName(),
+      platform: this.platform,
       onEvent: (event) => this.handleWsEvent(event),
     });
     this.ws.connect();
@@ -475,8 +492,10 @@ export class SyncHost {
 
     const reconcileMs = this.opts.reconcileIntervalMs ?? DEFAULT_RECONCILE_INTERVAL_MS;
     if (reconcileMs > 0) {
-      this.reconcileTimer = setInterval(() => this.runReconcile("periodic reconcile"), reconcileMs);
-      this.unref(this.reconcileTimer);
+      this.reconcileTimer = this.platform.every(reconcileMs, () =>
+        this.runReconcile("periodic reconcile"),
+      );
+      this.reconcileTimer.unref?.();
     }
 
     // Settings files fire no vault event (the config folder is not in Obsidian's
@@ -484,8 +503,8 @@ export class SyncHost {
     // Nothing to poll when every config-folder group is off.
     const pollMs = this.opts.settingsPollIntervalMs ?? DEFAULT_SETTINGS_POLL_INTERVAL_MS;
     if (pollMs > 0 && syncsAnySettings(this.scope)) {
-      this.settingsTimer = setInterval(() => this.runSettingsPoll(), pollMs);
-      this.unref(this.settingsTimer);
+      this.settingsTimer = this.platform.every(pollMs, () => this.runSettingsPoll());
+      this.settingsTimer.unref?.();
     }
 
     // The event source was wired only after the bind returned, so an edit made while a
@@ -508,7 +527,9 @@ export class SyncHost {
    */
   async whenIdle(): Promise<void> {
     while (this.background > 0 || this.reconciling || this.ops.running > 0 || this.ops.queued > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise<void>((resolve) => {
+        this.platform.after(50, resolve);
+      });
     }
   }
 
@@ -524,18 +545,18 @@ export class SyncHost {
     this.stopEvents = null;
     this.cancelBindRetry();
     if (this.pushFlushTimer !== null) {
-      clearTimeout(this.pushFlushTimer);
+      this.pushFlushTimer.cancel();
       this.pushFlushTimer = null;
     }
     // The socket is gone: notifications held for it are dropped, and the next pass
     // reads the index instead.
     this.pendingPushes = [];
     if (this.reconcileTimer !== null) {
-      clearInterval(this.reconcileTimer);
+      this.reconcileTimer.cancel();
       this.reconcileTimer = null;
     }
     if (this.settingsTimer !== null) {
-      clearInterval(this.settingsTimer);
+      this.settingsTimer.cancel();
       this.settingsTimer = null;
     }
     this.settingsPollFailed = false;
@@ -561,7 +582,8 @@ export class SyncHost {
       opLimits: this.opLimits,
       // `stop()` aborts this: a pass waiting out a limiter window must not outlive the
       // host that asked for it (see `waitAbort`).
-      wait: (ms) => waitForAbort(ms, waitAbort.signal),
+      wait: (ms) => waitForAbort(ms, waitAbort.signal, this.platform),
+      platform: this.platform,
       onConflictResolved: this.opts.onConflictResolved,
       onFileTooLarge: this.opts.onFileTooLarge,
       onFileSkipped: this.opts.onFileSkipped,
@@ -617,11 +639,6 @@ export class SyncHost {
     this.log(`${label} failed: the credential is no longer usable (${reason})`, err);
     this.stop();
     this.opts.onAuthFailure?.(reason);
-  }
-
-  /** `unref` exists in Bun (tests, the CLI) but not in Obsidian's renderer. */
-  private unref(timer: ReturnType<typeof setInterval>): void {
-    (timer as unknown as { unref?: () => void }).unref?.();
   }
 
   /**
@@ -713,13 +730,15 @@ export class SyncHost {
       this.flushPushedFiles();
       return;
     }
-    this.pushFlushTimer ??= setTimeout(() => this.flushPushedFiles(), PUSH_NOTIFICATION_FLUSH_MS);
+    this.pushFlushTimer ??= this.platform.after(PUSH_NOTIFICATION_FLUSH_MS, () =>
+      this.flushPushedFiles(),
+    );
   }
 
   /** Send the held notifications as one batch; a no-op when nothing is held. */
   private flushPushedFiles(): void {
     if (this.pushFlushTimer !== null) {
-      clearTimeout(this.pushFlushTimer);
+      this.pushFlushTimer.cancel();
       this.pushFlushTimer = null;
     }
     if (this.pendingPushes.length === 0) return;
@@ -791,19 +810,19 @@ export class SyncHost {
     if (this.stopped || this.bindRetryTimer !== null) return;
     const delay = this.bindRetryMs;
     this.bindRetryMs = Math.min(BIND_RETRY_MAX_MS, this.bindRetryMs * 2);
-    const timer = setTimeout(() => {
+    const timer = this.platform.after(delay, () => {
       this.bindRetryTimer = null;
       if (this.stopped) return;
       this.runReconcile("bind retry");
-    }, delay);
-    this.unref(timer);
+    });
+    timer.unref?.();
     this.bindRetryTimer = timer;
   }
 
   /** Drop a scheduled bind retry (a later pass succeeded, or the host is stopping). */
   private cancelBindRetry(): void {
     if (this.bindRetryTimer !== null) {
-      clearTimeout(this.bindRetryTimer);
+      this.bindRetryTimer.cancel();
       this.bindRetryTimer = null;
     }
     this.bindRetryMs = BIND_RETRY_INITIAL_MS;

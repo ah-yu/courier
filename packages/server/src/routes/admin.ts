@@ -85,7 +85,7 @@ export function adminRoutes(hub: WsHub, logger: Logger = processLogger): RouteTa
         return json(
           buildRuntimeResponse({
             version: VERSION,
-            runtime: runtimeLabel(),
+            runtime: runtimeLabel(process.versions),
             pid: process.pid,
             uptimeSeconds: process.uptime(),
             cpuMicros: cpu.micros,

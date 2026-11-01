@@ -1,3 +1,4 @@
+import { realPlatform } from "@courier/testing";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -444,6 +445,7 @@ describe("sync e2e — two clients through a real server", () => {
     const states: WsConnectionState[] = [];
     const pushed: Array<{ fileId: string; versionId: string }> = [];
     const socket = new SyncWebSocket({
+      platform: realPlatform,
       wsUrl: server.wsUrl,
       vaultId: vault.id,
       userKey: server.userKey,
@@ -487,6 +489,7 @@ describe("sync e2e — two clients through a real server", () => {
     const states: WsConnectionState[] = [];
     const pulls: Array<Promise<void>> = [];
     const socket = new SyncWebSocket({
+      platform: realPlatform,
       wsUrl: server.wsUrl,
       vaultId: vault.id,
       userKey: server.userKey,

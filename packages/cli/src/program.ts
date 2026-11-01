@@ -34,6 +34,7 @@ import { t } from "./i18n";
 import { parseIntervalMinutes, selectVaults } from "./options";
 import { createCliClient } from "./api";
 import { LeaseStore } from "./lease";
+import { cliPlatform } from "./platform";
 import { FsAdapter } from "./fs-adapter";
 import { runDaemon, runOnceSync, type RunnerHandle } from "./runner";
 import { clearActivityLog } from "./history";
@@ -206,7 +207,7 @@ export function createProgram(): Command {
         version: VERSION,
         gitSha: GIT_SHA,
         buildTime: BUILD_TIME,
-        runtime: runtimeLabel(),
+        runtime: runtimeLabel(process.versions),
       };
       if (options.json) {
         console.log(JSON.stringify(identity));
@@ -596,7 +597,14 @@ export function createProgram(): Command {
           daemon: daemonStatus(current.vaultId),
           // A record that has expired, or whose CLI process no longer exists on this
           // machine, is not a current owner: the next acquire takes it over.
-          lease: leaseIsCurrent(lease, Date.now(), pidAlive, hostname()) ? lease : null,
+          lease: leaseIsCurrent(
+            lease,
+            Date.now(),
+            (pid) => pidAlive(pid, cliPlatform.process),
+            hostname(),
+          )
+            ? lease
+            : null,
           coexistence: detectCoexistence(current),
         });
       }

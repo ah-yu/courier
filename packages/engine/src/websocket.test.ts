@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { stubGlobal, restoreGlobals } from "@courier/testing";
+import { stubGlobal, restoreGlobals, realPlatform } from "@courier/testing";
 import { SyncWebSocket, type SyncWebSocketOptions, type WsEvent } from "./websocket";
 
 /**
@@ -85,6 +85,7 @@ class FakeWebSocket {
 function makeSocket(overrides: Partial<SyncWebSocketOptions> = {}) {
   const events: WsEvent[] = [];
   const socket = new SyncWebSocket({
+    platform: realPlatform,
     wsUrl: "ws://host/ws",
     vaultId: "v1",
     userKey: "ck_user",
