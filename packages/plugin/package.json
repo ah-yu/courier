@@ -3,17 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun scripts/dev-setup.ts && bun scripts/open-vaults.ts && tsc --noEmit && bun scripts/build.ts --watch",
     "build": "tsc --noEmit && bun scripts/build.ts --production",
-    "typecheck": "tsc --noEmit",
-    "setup:vault": "bun scripts/setup-vault.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@courier/engine": "workspace:*",
     "@courier/shared": "workspace:*",
-    "obsidian": "^1.10.13"
-  },
-  "devDependencies": {
-    "@courier/testing": "workspace:*"
+    "obsidian": "^1.13.0"
   }
 }

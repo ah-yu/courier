@@ -10,8 +10,5 @@
   },
   "dependencies": {
     "@courier/shared": "workspace:*"
-  },
-  "devDependencies": {
-    "@courier/testing": "workspace:*"
   }
 }
