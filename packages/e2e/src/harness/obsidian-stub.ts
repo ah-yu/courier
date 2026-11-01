@@ -16,6 +16,17 @@
 
 // ── Fake DOM ──
 
+// ── The renderer's `window` ──
+//
+// Bun has no `window`, and the plugin's platform (`packages/plugin/src/platform.ts`) is
+// written for the one runtime the plugin really runs in. Defining the global here, where
+// the suite already stands in for the app, keeps plugin source truthful instead of
+// teaching it to branch on a runtime it never sees. Engine suites never import this file,
+// so the "the engine needs no window" property that L1 proves stays unweakened.
+if (typeof (globalThis as { window?: unknown }).window === "undefined") {
+  (globalThis as { window?: unknown }).window = globalThis;
+}
+
 /**
  * Chainable stand-in for Obsidian's DOM element extensions
  * (`createEl`/`createDiv`/`empty`/`setText`…). Children are recorded so a test

@@ -31,6 +31,7 @@ import {
   type CliVault,
 } from "./config";
 import { RuntimeWriter } from "./runtime";
+import { cliPlatform } from "./platform";
 import { clearActivityLog, recordRunActivity } from "./history";
 
 /**
@@ -162,6 +163,7 @@ async function buildEngine(
   const syncApi = api ?? createCliSyncApi(cliSyncApiOptions(config, vault));
   const engine = new SyncEngine({
     vaultId: vault.vaultId,
+    platform: cliPlatform,
     adapter,
     api: syncApi,
     encryptionKey: key,
@@ -256,6 +258,7 @@ export async function runOnceSync(
     owner: "cli",
     // Recorded so a reader can tell whether this pid is evidence on its own machine.
     host: hostname(),
+    process: cliPlatform.process,
   });
   let acquired: boolean;
   try {
@@ -314,6 +317,7 @@ export async function runDaemon(
     owner: "cli",
     // Recorded so a reader can tell whether this pid is evidence on its own machine.
     host: hostname(),
+    process: cliPlatform.process,
   });
   let host: SyncHost | null = null;
   let stopped = false;
@@ -464,6 +468,8 @@ export async function runDaemon(
       api: createCliSyncApi(cliSyncApiOptions(config, vault)),
       wsUrl: httpToWsUrl(config.serverUrl),
       userKey: config.userKey,
+      // Bun's timers, unref'd so an idle daemon can still exit.
+      platform: cliPlatform,
       // Read from the config file, so `device rename` applies without a restart.
       getDeviceName: () => loadConfig()?.deviceName ?? config.deviceName,
       eventSource: fsWatchEventSource(vaultPath, scope, opts),

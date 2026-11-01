@@ -27,7 +27,7 @@ export function buildVersionInfo(overrides: Partial<VersionInfo> = {}): VersionI
     version: VERSION,
     gitSha: GIT_SHA,
     buildTime: BUILD_TIME,
-    runtime: runtimeLabel(),
+    runtime: runtimeLabel(process.versions),
     ...overrides,
   };
 }

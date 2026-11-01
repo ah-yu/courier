@@ -6,14 +6,12 @@
  * branches keep the helper total without ever naming a runtime the process is not
  * on — `process.version` is a compatibility label, which is why it is never read.
  *
- * Read through `globalThis` rather than the bare identifier: `@courier/shared`
- * declares no runtime types on purpose (it is also bundled into the plugin), so
- * `process` is not a known global there.
+ * The versions bag is an argument rather than a read of the global `process`:
+ * `@courier/shared` is also bundled into the plugin, which declares no runtime types
+ * and may have no `process` at all, so this module makes no runtime assumption and
+ * each caller passes what its own runtime reports.
  */
-export function runtimeLabel(): string {
-  const proc = (globalThis as { process?: { versions?: Record<string, string | undefined> } })
-    .process;
-  const versions = proc?.versions;
+export function runtimeLabel(versions?: Record<string, string | undefined>): string {
   if (!versions) return "unknown";
   if (versions.bun) return `bun/${versions.bun}`;
   if (versions.electron) return `electron/${versions.electron}`;

@@ -18,6 +18,7 @@ import {
   sha256Text,
 } from "./crypto";
 import { chunkBounds, chunkCountForSize, shouldTransferInChunks } from "./chunked-transfer";
+import type { Platform } from "./platform";
 import { generateFileId, generateVersionId } from "./ids";
 import { isConflictFile, conflictFilePath } from "./conflict-file";
 import {
@@ -217,6 +218,14 @@ export interface EngineOptions {
    * in a host, the vault lease) must not be held for the whole window.
    */
   wait?: (ms: number) => Promise<void>;
+  /**
+   * The runtime this pass runs on (see `Platform`).
+   *
+   * Required: the engine names no global of its own, so every construction site states
+   * which runtime it is on. The default `wait` (the one timer on this path) schedules
+   * through it.
+   */
+  platform: Platform;
 }
 
 /**
@@ -2769,7 +2778,7 @@ export class SyncEngine {
           // A host callback is not allowed to fail the pass.
         }
         try {
-          await (this.opts.wait ?? sleep)(waitMs);
+          await (this.opts.wait ?? ((ms: number) => sleep(ms, this.opts.platform)))(waitMs);
         } catch {
           // The wait was cancelled (the host stopped): answer the refusal it was waiting
           // out rather than retrying for a pass nobody is waiting for.

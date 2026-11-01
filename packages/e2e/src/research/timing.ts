@@ -5,6 +5,7 @@
  * only additions are counters and clocks around the adapter and the API, so a run can
  * say **where** a first bind spends its time instead of only how long it took.
  */
+import { realPlatform } from "@courier/testing";
 import { mkdirSync, readdirSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import type { TestServer } from "../harness/server";
@@ -316,6 +317,7 @@ export async function runEngine(label: string, options: RunOptions): Promise<Bin
   const engine =
     options.previous?.engine ??
     new SyncEngine({
+      platform: realPlatform,
       vaultId: options.vaultId,
       adapter,
       api,

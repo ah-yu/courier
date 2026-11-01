@@ -224,7 +224,8 @@ protocol or a security hole. Read the linked section before changing one.
     reconcile, the reconnect-only reconcile, the settings poll, `OpQueue`, session-id propagation
     and `stop()`; `user_key_revoked` / `user_key_disabled` / `vault_deleted`, and any HTTP
     `401`/`403` on a pass, stop the host before reporting (`onAuthFailure(reason)`). A host
-    supplies only the adapter, event source, network and state store. See
+    supplies only the adapter, event source, network, state store and **platform** (timers, plus
+    the optional Node surface); the engine names no global of its own. See
     [sync-engine.md](docs/sync-engine.md#the-host-loop).
 13. **The server holds no content semantics.** Chains plus content-addressed encrypted blobs
     (bytes, one per hash, never a truncating rewrite; a blob is a byte range in one immutable

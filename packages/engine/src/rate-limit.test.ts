@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { realPlatform } from "@courier/testing";
 import {
   DEFAULT_RATE_LIMIT_WAIT_MS,
   MAX_RATE_LIMIT_WAIT_MS,
@@ -83,7 +84,7 @@ describe("rateLimitWaitMs", () => {
 describe("sleep", () => {
   it("resolves after the delay", async () => {
     const started = performance.now();
-    await sleep(20);
+    await sleep(20, realPlatform);
     expect(performance.now() - started).toBeGreaterThanOrEqual(10);
   });
 });

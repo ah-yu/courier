@@ -1,3 +1,4 @@
+import { realPlatform } from "@courier/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SyncEngine, type ConflictResolvedEvent } from "./engine";
 import type { FileStamp, SyncAdapter, SyncWriteStream } from "./adapter";
@@ -654,6 +655,7 @@ async function makeEngine(
   const adapter = new FakeAdapter();
   const api = new FakeApi(key);
   const engine = new SyncEngine({
+    platform: realPlatform,
     vaultId: "vault-1",
     adapter,
     api,
@@ -746,6 +748,7 @@ function engineOver(
   onSettingsApplied?: (event: SettingsAppliedEvent) => void,
 ): SyncEngine {
   return new SyncEngine({
+    platform: realPlatform,
     vaultId: "vault-1",
     adapter,
     api,
@@ -787,6 +790,7 @@ function fileTypesEngine(
   onFileTooLarge?: (event: FileTooLargeEvent) => void,
 ): SyncEngine {
   return new SyncEngine({
+    platform: realPlatform,
     vaultId: "vault-1",
     adapter,
     api,
@@ -828,6 +832,7 @@ describe("SyncEngine", () => {
     // Another engine bound to the same vault pulls the files down.
     const adapter2 = new FakeAdapter();
     const engine2 = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: adapter2,
       api,
@@ -863,6 +868,7 @@ describe("SyncEngine", () => {
 
     const saves: string[] = [];
     const peer = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: new FakeAdapter(),
       api,
@@ -904,6 +910,7 @@ describe("SyncEngine", () => {
 
     const peerAdapter = new FakeAdapter();
     const peer = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: peerAdapter,
       api,
@@ -935,6 +942,7 @@ describe("SyncEngine", () => {
 
     const peerAdapter = new FakeAdapter();
     const peer = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: peerAdapter,
       api,
@@ -1100,6 +1108,7 @@ describe("SyncEngine conflicts", () => {
     // A client that only has the directory — a restart, a reconnect, a reopened
     // Obsidian — reconciles instead of diffing its own state.
     const reopened = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter,
       api,
@@ -1243,6 +1252,7 @@ describe("SyncEngine conflicts", () => {
     // no state — has nothing to compare the tombstone against, so the file gets a
     // fresh identity instead of being deleted by the connection.
     const bound = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter,
       api,
@@ -1334,6 +1344,7 @@ describe("SyncEngine — changes made while the connection is down", () => {
     // from what settings hold, which is the state from *before* the deletion.
     api.offline = false;
     const restored = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter,
       api,
@@ -1375,6 +1386,7 @@ describe("SyncEngine — changes made while the connection is down", () => {
     adapter.files.set("n.md", encoder.encode("v2 from another editor"));
 
     const rebound = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter,
       api,
@@ -1447,6 +1459,7 @@ describe("SyncEngine — changes made while the connection is down", () => {
 
     api.offline = false;
     const restored = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter,
       api,
@@ -1864,6 +1877,7 @@ describe("SyncEngine — a push the chain has moved past", () => {
       const sourceAdapter = new FakeAdapter();
       sourceAdapter.files.set("n.md", encoder.encode("same"));
       const source = new SyncEngine({
+        platform: realPlatform,
         vaultId: "vault-1",
         adapter: sourceAdapter,
         api,
@@ -1874,6 +1888,7 @@ describe("SyncEngine — a push the chain has moved past", () => {
       const targetAdapter = new FakeAdapter();
       targetAdapter.files.set("n.md", encoder.encode("same"));
       const target = new SyncEngine({
+        platform: realPlatform,
         vaultId: "vault-1",
         adapter: targetAdapter,
         api,
@@ -2431,6 +2446,7 @@ describe("SyncEngine — the vault event caused by its own write", () => {
     // A peer on the same vault edits the second file.
     const peerAdapter = new FakeAdapter();
     const peer = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: peerAdapter,
       api,
@@ -2529,6 +2545,7 @@ describe("SyncEngine — restoring onto a path that is no longer free", () => {
     adapter.files.delete("hero.md"); // what the user's delete does to the disk
 
     const reopened = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter,
       api,
@@ -3980,6 +3997,7 @@ describe("SyncEngine — the sync scope", () => {
       // the engine's "skip before reading" rule has to watch itself.
       const scope: SyncScope = { ...OBSIDIAN_DEFAULT, maxFileBytes: 8 };
       const engine = new SyncEngine({
+        platform: realPlatform,
         vaultId: "vault-1",
         adapter,
         api,
@@ -4435,6 +4453,7 @@ describe("SyncEngine — what a large file costs", () => {
     // …and a peer reads it back.
     const peerAdapter = new FakeAdapter();
     const peer = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: peerAdapter,
       api,
@@ -4489,6 +4508,7 @@ describe("SyncEngine — what a large file costs", () => {
     // A second engine over the same persisted state and the same filesystem — what
     // reopening Obsidian does.
     const restarted = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter,
       api,
@@ -4570,6 +4590,7 @@ describe("SyncEngine — what a large file costs", () => {
     // chain alone.
     const peerAdapter = new FakeAdapter();
     const peer = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: peerAdapter,
       api,
@@ -4630,6 +4651,7 @@ describe("SyncEngine — what a large file costs", () => {
     // A peer fetches the version one range at a time and reassembles it.
     const peerAdapter = new FakeAdapter();
     const peer = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: peerAdapter,
       api,
@@ -5085,6 +5107,7 @@ describe("SyncEngine — a first bind that meets the server's limits", () => {
 
     const progress: SyncProgress[] = [];
     const download = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: new FakeAdapter(),
       api,
@@ -5183,6 +5206,7 @@ describe("SyncEngine — a first bind that meets the server's limits", () => {
     // A fresh device pulls the same chain, but its content request is refused.
     const downloadAdapter = new FakeAdapter();
     const download = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: downloadAdapter,
       api,
@@ -5213,6 +5237,7 @@ describe("SyncEngine — a first bind that meets the server's limits", () => {
 
     const downloadAdapter = new FakeAdapter();
     const download = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: downloadAdapter,
       api,
@@ -5244,6 +5269,7 @@ describe("SyncEngine — a first bind that meets the server's limits", () => {
 
     const downloadAdapter = new FakeAdapter();
     const download = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: downloadAdapter,
       api,
@@ -5335,6 +5361,7 @@ describe("SyncEngine — the order a pass works in", () => {
 
     const targetAdapter = new FakeAdapter();
     const target = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: targetAdapter,
       api,
@@ -5365,6 +5392,7 @@ describe("SyncEngine — the order a pass works in", () => {
 
     const targetAdapter = new FakeAdapter();
     const target = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: targetAdapter,
       api,
@@ -5441,6 +5469,7 @@ describe("SyncEngine — how much a pass runs at once", () => {
 
     const targetAdapter = new FakeAdapter();
     const target = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: targetAdapter,
       api,
@@ -5497,6 +5526,7 @@ describe("SyncEngine — how much a pass runs at once", () => {
 
     const targetAdapter = new FakeAdapter();
     const target = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: targetAdapter,
       api,
@@ -5568,6 +5598,7 @@ describe("SyncEngine — two chains naming one path", () => {
     const sourceAdapter = new FakeAdapter();
     sourceAdapter.files.set("old.md", encoder.encode("old"));
     const source = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: sourceAdapter,
       api,
@@ -5580,6 +5611,7 @@ describe("SyncEngine — two chains naming one path", () => {
     targetAdapter.files.set("old.md", encoder.encode("old"));
     const conflicts: ConflictResolvedEvent[] = [];
     const target = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: targetAdapter,
       api,
@@ -5603,6 +5635,7 @@ describe("SyncEngine — two chains naming one path", () => {
     const peerAdapter = new FakeAdapter();
     peerAdapter.files.set("old.md", encoder.encode("new note"));
     const peer = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: peerAdapter,
       api,
@@ -5677,6 +5710,7 @@ describe("sync activity", () => {
     const events: SyncActivityEvent[] = [];
     const receiverAdapter = new FakeAdapter();
     const receiver = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: receiverAdapter,
       api: sender.api,
@@ -5719,6 +5753,7 @@ describe("sync activity", () => {
     const events: SyncActivityEvent[] = [];
     const receiverAdapter = new FakeAdapter();
     const receiver = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: receiverAdapter,
       api: sender.api,
@@ -5807,6 +5842,7 @@ describe("sync activity", () => {
 
     const events: SyncActivityEvent[] = [];
     const reopened = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter,
       api,
@@ -5835,6 +5871,7 @@ describe("sync activity", () => {
     // whose version this device is about to apply.
     const olderEvents: SyncActivityEvent[] = [];
     const olderReceiver = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: new FakeAdapter(),
       api: sender.api,
@@ -5854,6 +5891,7 @@ describe("sync activity", () => {
     // The head's own notification carries the pusher's label.
     const headEvents: SyncActivityEvent[] = [];
     const headReceiver = new SyncEngine({
+      platform: realPlatform,
       vaultId: "vault-1",
       adapter: new FakeAdapter(),
       api: sender.api,

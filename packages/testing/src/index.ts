@@ -7,11 +7,14 @@
  * `*.test.ts` / harness file imports this package, and it is a
  * `devDependencies` entry everywhere it is used.
  *
- * They exist because the test runner has no equivalent for three things the suites
- * need in several packages.
+ * They exist because the test runner has no equivalent for the handful of things the
+ * suites need in several packages.
  */
 import { rmSync } from "fs";
 import { vi } from "vitest";
+
+// The suites' runtime, for the classes that now take one (`platform: realPlatform`).
+export * from "./platform";
 
 /**
  * These helpers run under both runtimes this repository tests on: Bun (the suite's
