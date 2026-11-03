@@ -1,11 +1,26 @@
-import { App, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import {
+  App,
+  PluginSettingTab,
+  Setting,
+  setIcon,
+  type ButtonComponent,
+  type SettingDefinition,
+  type SettingDefinitionItem,
+  type SettingGroupItem,
+  type TextComponent,
+} from "obsidian";
 import {
   FILE_TYPE_GROUPS,
   SETTINGS_GROUPS,
   type FileTypeGroup,
   type SettingsGroup,
 } from "@courier/engine";
-import { MAX_DEVICE_NAME_LENGTH, type UserSummary } from "@courier/shared";
+import {
+  MAX_DEVICE_NAME_LENGTH,
+  MAX_HISTORY_LIMIT,
+  type HistoryLimits,
+  type UserSummary,
+} from "@courier/shared";
 import { plural, t, type PluginMessageKey } from "../i18n";
 import type CourierPlugin from "../main";
 import { VaultPickerModal } from "./dialogs/vault-picker-modal";
@@ -46,6 +61,20 @@ const FILE_TYPE_DESCRIPTION_KEYS: Record<FileTypeGroup, PluginMessageKey> = {
   pdf: "settings.fileType.pdf.desc",
   otherTypes: "settings.fileType.otherTypes.desc",
 };
+
+/** The catalog key of each history-limit row's label and description. */
+const HISTORY_LIMIT_LABEL_KEYS: Record<keyof HistoryLimits, PluginMessageKey> = {
+  documents: "settings.historyLimit.documents.label",
+  attachments: "settings.historyLimit.attachments.label",
+};
+
+const HISTORY_LIMIT_DESCRIPTION_KEYS: Record<keyof HistoryLimits, PluginMessageKey> = {
+  documents: "settings.historyLimit.documents.desc",
+  attachments: "settings.historyLimit.attachments.desc",
+};
+
+/** The two history-limit rows, in the order the section shows them. */
+const HISTORY_LIMIT_KINDS: readonly (keyof HistoryLimits)[] = ["documents", "attachments"];
 
 /** The catalog key of each config-folder group's label and description. */
 const SETTINGS_GROUP_LABEL_KEYS: Record<SettingsGroup, PluginMessageKey> = {
@@ -96,9 +125,10 @@ function describeSettingsGroup(group: SettingsGroup): string {
  * notices, and the step never changes on a failure, so nothing the user typed is
  * lost.
  *
- * There is no page title and no step counter: the controls say what they are, and a
- * settings page that opens with a heading repeating the plugin's name is one line of
- * chrome the user has to read past every time.
+ * There is no settings-level title and no step counter: the sign-in form has its own
+ * heading, and everywhere else the controls say what they are. A settings page that opens
+ * with a heading repeating the plugin's name is one line of chrome the user reads past
+ * every time.
  */
 export class CourierSettingTab extends PluginSettingTab {
   private plugin: CourierPlugin;
@@ -118,6 +148,37 @@ export class CourierSettingTab extends PluginSettingTab {
    * one live line without rebuilding the page.
    */
   private connectionRow: Setting | null = null;
+  /**
+   * The login row, the grouping panel around it and that panel's parent. The row loses its
+   * chrome, the panel is flattened and the parent is stretched so the form can centre in
+   * the visible tab; all three are tracked so the next stage can put the app's own chrome
+   * back, even if the app reuses the elements.
+   */
+  private loginRowEl: HTMLElement | null = null;
+  private loginGroupEl: HTMLElement | null = null;
+  private loginPageEl: HTMLElement | null = null;
+  /** Re-measures the URL field when the window (or phone rotation) changes its width. */
+  private loginResizeObserver: ResizeObserver | null = null;
+  /** Set by a failed sign-in so the re-render can put focus back on the key field. */
+  private focusLoginKey = false;
+  /**
+   * Removers for the "pressed outside" listeners of history-limit rows in edit mode.
+   *
+   * A row registers one while it is being edited and removes it when the edit ends. A
+   * full re-render replaces the row (and the modal can be closed) without going through
+   * `stopEditing`, so the page clears whatever is left before drawing again — otherwise a
+   * listener would outlive the row it belongs to.
+   */
+  private historyLimitDismissers = new Set<() => void>();
+  /**
+   * Repainters for the history-limit rows, one per rendered row.
+   *
+   * A change made on another device arrives over the WebSocket; the plugin updates the
+   * cached pair and calls {@link applyVaultLimits}, which repaints the rows in place —
+   * rebuilding the page would drop an edit in progress and the scroll position. Cleared
+   * with the dismissers when the page renders again.
+   */
+  private historyLimitPaints = new Set<() => void>();
 
   constructor(app: App, plugin: CourierPlugin) {
     super(app, plugin);
@@ -163,7 +224,16 @@ export class CourierSettingTab extends PluginSettingTab {
     // A full render replaces every row; the old connection row must not stay reachable by a
     // state change that arrives before the new one exists.
     this.connectionRow = null;
-    switch (this.stage()) {
+    // The same for a history row that was in edit mode: its outside listener belongs to
+    // the row the render is about to replace.
+    this.clearHistoryLimitDismissers();
+    this.historyLimitPaints.clear();
+    const stage = this.stage();
+    // The login step owns the classes that flatten and centre it. Only another step (or a
+    // re-render of this one, which cleans up at its own start) gets the app's chrome back;
+    // a call that merely indexes or warms this page must not un-centre it.
+    if (stage !== "login") this.clearLoginChrome();
+    switch (stage) {
       case "login":
         return this.loginDefinitions(alwaysVisible);
       case "choose":
@@ -220,8 +290,30 @@ export class CourierSettingTab extends PluginSettingTab {
   }
 
   override hide(): void {
-    // A pending device-name save must not be lost when the tab closes.
+    // A pending device-name save must not be lost when the tab closes. A history-limit
+    // edit is deliberately not flushed: it is saved only by the row's own check icon,
+    // which is what tells the user whether the vault was changed.
     this.flushDeviceName();
+    this.clearHistoryLimitDismissers();
+    this.historyLimitPaints.clear();
+  }
+
+  /**
+   * Repaint the history-limit rows from the cached server pair.
+   *
+   * Called when the vault's limits change on another device: the open page follows without
+   * being reopened. A row the user is editing is repainted underneath them (its value
+   * display and icon state) but their field keeps what they typed, so the edit is not
+   * destroyed.
+   */
+  applyVaultLimits(): void {
+    for (const paint of this.historyLimitPaints) paint();
+  }
+
+  /** Drop every "pressed outside" listener the history rows registered (see the field). */
+  private clearHistoryLimitDismissers(): void {
+    for (const remove of this.historyLimitDismissers) remove();
+    this.historyLimitDismissers.clear();
   }
 
   // ── Stage ──
@@ -249,18 +341,27 @@ export class CourierSettingTab extends PluginSettingTab {
   // ── Section chrome ──
 
   /**
-   * A section header: the title, plus an info icon whose tooltip carries what a paragraph
-   * used to say (`setHeading()` is Obsidian's own section-heading row, and the extra button
-   * is where the explanation lives).
+   * A section: its title, the info icon whose tooltip carries what a paragraph used to say,
+   * and the rows under it.
+   *
+   * A `group` is the app's own section, not a heading row this page draws itself: the title
+   * is rendered above the group's card and the button sits on that heading (see
+   * `SettingDefinitionGroup`). That is also why the spacing around a title is the app's
+   * business — a title drawn as a row inherits the app's rule for a heading outside a card
+   * and ends up against the card's edge.
    */
-  private heading(name: string, tooltip: string, visible: () => boolean): SettingDefinitionItem {
+  private group(
+    heading: string,
+    tooltip: string,
+    visible: () => boolean,
+    items: SettingGroupItem[],
+  ): SettingDefinitionItem {
     return {
-      name,
+      type: "group",
+      heading,
       visible,
-      render: (setting) => {
-        setting.setName(name).setHeading();
-        setting.addExtraButton((button) => button.setIcon("help-circle").setTooltip(tooltip));
-      },
+      extraButtons: [(button) => button.setIcon("help-circle").setTooltip(tooltip)],
+      items,
     };
   }
 
@@ -269,7 +370,7 @@ export class CourierSettingTab extends PluginSettingTab {
    *
    * It is not a settings row: the row it is given loses its chrome and holds the line.
    */
-  private stageErrorItem(visible: () => boolean): SettingDefinitionItem {
+  private stageErrorItem(visible: () => boolean): SettingDefinition {
     return {
       name: "",
       visible: () => visible() && this.stageError !== null,
@@ -287,7 +388,7 @@ export class CourierSettingTab extends PluginSettingTab {
 
   /**
    * Step 1: the sign-in form. A form is not a row, so it stays one imperative item — and its
-   * own error line is drawn inside the card rather than as a second item, because two items
+   * own error line is drawn inside the form rather than as a second item, because two items
    * would carry the same (empty) name, and the app keys an item by that name.
    */
   private loginDefinitions(visible: () => boolean): SettingDefinitionItem[] {
@@ -297,9 +398,23 @@ export class CourierSettingTab extends PluginSettingTab {
         visible,
         render: (setting) => {
           // A form is not a settings row: the row it is given loses its chrome and holds the
-          // card, which keeps the centred form the step has always been.
+          // form. The panel that groups settings rows and its parent are flattened too, so
+          // the form — not the app's own card — is the surface the user sees. Clean the old
+          // login chrome first, so a re-render cannot leave two sets of classes behind.
+          this.clearLoginChrome();
           setting.settingEl.empty();
           setting.settingEl.addClass("courier-login-row");
+          this.loginRowEl = setting.settingEl;
+          const group = setting.settingEl.parentElement;
+          if (group) {
+            group.addClass("courier-login-group");
+            this.loginGroupEl = group;
+            const shell = group.parentElement;
+            if (shell) {
+              shell.addClass("courier-login-page");
+              this.loginPageEl = shell;
+            }
+          }
           this.renderLoginStage(setting.settingEl);
         },
       },
@@ -422,200 +537,292 @@ export class CourierSettingTab extends PluginSettingTab {
   private readyDefinitions(visible: () => boolean): SettingDefinitionItem[] {
     const unlocked = this.plugin.encryptionKey !== null;
     return [
-      this.heading(t("settings.section.device"), t("settings.section.device.tooltip"), visible),
-      {
-        name: t("settings.device.name"),
-        desc: t("settings.device.desc"),
-        visible,
-        // A `render` item, not a `text` control: the field caps what can be typed
-        // (`maxLength`, rather than a validation message after the fact) and commits when it
-        // loses focus, and a control has nowhere to hang either of those.
-        render: (setting) => this.buildDeviceNameRow(setting),
-      },
+      this.group(t("settings.section.device"), t("settings.section.device.tooltip"), visible, [
+        {
+          name: t("settings.device.name"),
+          desc: t("settings.device.desc"),
+          visible,
+          // A `render` item, not a `text` control: the field caps what can be typed
+          // (`maxLength`, rather than a validation message after the fact) and commits when it
+          // loses focus, and a control has nowhere to hang either of those.
+          render: (setting) => this.buildDeviceNameRow(setting),
+        },
+      ]),
 
-      this.heading(t("settings.section.vault"), t("settings.section.vault.tooltip"), visible),
-      {
-        name: t("settings.ready.connected", {
-          vault: this.plugin.settings.connectedVaultName ?? "",
-        }),
-        desc: this.syncStateLabel(),
-        visible,
-        render: (setting) => this.buildConnectionRow(setting),
-      },
-      {
-        name: t("settings.pause.name"),
-        visible,
-        render: (setting) => this.buildPauseRow(setting),
-      },
-      {
-        name: t("settings.vaultPassword.name"),
-        visible: () => visible() && this.hasRememberedPasswordRow(),
-        render: (setting) => this.buildRememberedPasswordRow(setting),
-      },
+      this.group(t("settings.section.vault"), t("settings.section.vault.tooltip"), visible, [
+        {
+          name: t("settings.ready.connected", {
+            vault: this.plugin.settings.connectedVaultName ?? "",
+          }),
+          desc: this.syncStateLabel(),
+          visible,
+          render: (setting) => this.buildConnectionRow(setting),
+        },
+        {
+          name: t("settings.pause.name"),
+          visible,
+          render: (setting) => this.buildPauseRow(setting),
+        },
+        {
+          name: t("settings.vaultPassword.name"),
+          visible: () => visible() && this.hasRememberedPasswordRow(),
+          render: (setting) => this.buildRememberedPasswordRow(setting),
+        },
+      ]),
 
-      this.heading(
+      this.group(
         t("settings.section.fileTypes"),
         t("settings.section.fileTypes.tooltip"),
         visible,
+        FILE_TYPE_GROUPS.map((group): SettingDefinition => ({
+          name: t(FILE_TYPE_LABEL_KEYS[group]),
+          desc: t(FILE_TYPE_DESCRIPTION_KEYS[group]),
+          visible,
+          control: { type: "toggle", key: `fileTypes.${group}` },
+        })),
       ),
-      ...FILE_TYPE_GROUPS.map((group): SettingDefinitionItem => ({
-        name: t(FILE_TYPE_LABEL_KEYS[group]),
-        desc: t(FILE_TYPE_DESCRIPTION_KEYS[group]),
-        visible,
-        control: { type: "toggle", key: `fileTypes.${group}` },
-      })),
 
-      this.heading(
+      this.group(
+        t("settings.section.historyLimit"),
+        t("settings.section.historyLimit.tooltip"),
+        visible,
+        HISTORY_LIMIT_KINDS.map((kind): SettingDefinition => ({
+          name: t(HISTORY_LIMIT_LABEL_KEYS[kind]),
+          desc: t(HISTORY_LIMIT_DESCRIPTION_KEYS[kind]),
+          visible,
+          // A `render` item rather than a `control`: the row owns a small state machine
+          // (text + pencil → input + check → back), and the number it shows afterwards is
+          // what the server really holds (a nonsense entry is refused inline, never stored).
+          render: (setting) => this.buildHistoryLimitRow(setting, kind),
+        })),
+      ),
+
+      this.group(
         t("settings.section.excludedFolders"),
         t("settings.section.excludedFolders.tooltip"),
         visible,
+        [
+          {
+            name: t("settings.excludedFolders.list.name"),
+            visible,
+            render: (setting) => this.buildExcludedFoldersRow(setting),
+          },
+        ],
       ),
-      {
-        name: t("settings.excludedFolders.list.name"),
-        visible,
-        render: (setting) => this.buildExcludedFoldersRow(setting),
-      },
 
-      this.heading(
+      this.group(
         t("settings.section.settingsSync"),
         t("settings.section.settingsSync.tooltip"),
         visible,
+        [
+          ...SETTINGS_GROUPS.map((group): SettingDefinition => ({
+            name: t(SETTINGS_GROUP_LABEL_KEYS[group]),
+            desc: describeSettingsGroup(group),
+            visible,
+            control: { type: "toggle", key: `settingsGroups.${group}` },
+          })),
+          {
+            name: t("settings.history.name"),
+            desc: t("settings.history.desc"),
+            visible,
+            render: (setting) => this.buildHistoryRow(setting),
+          },
+          {
+            name: t("settings.recycleBin.name"),
+            visible,
+            render: (setting) => this.buildRecycleBinRow(setting, unlocked),
+          },
+        ],
       ),
-      ...SETTINGS_GROUPS.map((group): SettingDefinitionItem => ({
-        name: t(SETTINGS_GROUP_LABEL_KEYS[group]),
-        desc: describeSettingsGroup(group),
-        visible,
-        control: { type: "toggle", key: `settingsGroups.${group}` },
-      })),
 
-      {
-        name: t("settings.history.name"),
-        desc: t("settings.history.desc"),
-        visible,
-        render: (setting) => this.buildHistoryRow(setting),
-      },
-      {
-        name: t("settings.recycleBin.name"),
-        visible,
-        render: (setting) => this.buildRecycleBinRow(setting, unlocked),
-      },
-
-      this.heading(t("settings.section.account"), t("settings.section.account.tooltip"), visible),
-      {
-        name: this.plugin.settings.userName ?? t("settings.account.reading"),
-        visible,
-        render: (setting) => this.buildAccountRow(setting),
-      },
-      this.stageErrorItem(visible),
+      this.group(t("settings.section.account"), t("settings.section.account.tooltip"), visible, [
+        {
+          name: this.plugin.settings.userName ?? t("settings.account.reading"),
+          visible,
+          render: (setting) => this.buildAccountRow(setting),
+        },
+      ]),
     ];
   }
 
   // ── Step 1: sign in ──
 
   /**
-   * The whole login step: two labelled fields and one button, centred.
+   * The whole login step: one centred form, not a settings row and not a card.
    *
-   * No heading and no description — the fields say what they are, and the step is
-   * the first thing a fresh install shows, so there is nothing to explain. It is
-   * deliberately **not** a set of Obsidian settings rows either: those put the label
-   * on the left and the control on the right, which is right for a switch and wrong
-   * for a form.
+   * The settings pane is already the surface, so this page adds no panel, background or
+   * brand block of its own — the title, the two fields and the button are the whole view,
+   * and they sit in the middle of the pane instead of at its top edge.
    *
-   * The fields persist as they are typed but never re-render the page (a rebuild on
-   * every keystroke would take the caret with it), so validation and the request
-   * happen on the button, and its outcome decides the next step. Enter submits, as on
-   * any web login.
+   * The address field is the one value that can outgrow its input. It stays on one line (an
+   * input cannot wrap), and when the value is wider than the field the full address is
+   * repeated underneath in a line that wraps, so no part of a server URL is ever hidden.
+   *
+   * The fields persist as they are typed but never re-render the page (a rebuild on every
+   * keystroke would take the caret with it), so validation and the request happen on the
+   * button, and its outcome decides the next step. Enter submits, as on any web login.
    */
   private renderLoginStage(containerEl: HTMLElement): void {
-    const card = containerEl.createDiv({ cls: "courier-login" });
-    // A narrow column in the middle of the pane, with nothing above it: the page has
-    // no title, so the form is the whole step.
-    card.setCssStyles({ maxWidth: "360px", margin: "48px auto 0" });
+    const page = containerEl.createDiv({ cls: "courier-login" });
+    const panel = page.createDiv({ cls: "courier-login-panel" });
+    const head = panel.createDiv({ cls: "courier-login-head" });
+    // A `div` with the heading role rather than an `h2`: the app's heading rules are sized
+    // for settings sections, and this is the page's functional title.
+    const title = head.createDiv({
+      cls: "courier-login-title",
+      text: t("settings.login.title"),
+    });
+    title.setAttribute("role", "heading");
+    title.setAttribute("aria-level", "2");
+    head.createDiv({ cls: "courier-login-subtitle", text: t("settings.login.subtitle") });
 
-    const serverInput = this.renderLoginField(card, t("settings.login.serverAddress"), {
+    const form = panel.createDiv({ cls: "courier-login-form" });
+
+    const server = this.renderLoginField(form, "server", t("settings.login.serverAddress"), {
       type: "text",
-      placeholder: "http://localhost:3002",
+      placeholder: t("settings.login.serverPlaceholder"),
       value: this.plugin.settings.serverUrl ?? "",
+      icon: "server",
       onChange: (value) => {
         this.plugin.settings.serverUrl = value.trim() || null;
         void this.plugin.saveSettings();
       },
     });
-    const keyInput = this.renderLoginField(card, t("settings.login.userKey"), {
+
+    const fullAddress = server.field.createDiv({ cls: "courier-login-url-full" });
+    fullAddress.setAttribute("aria-live", "polite");
+    const syncFullAddress = (): void => {
+      const value = server.input.value.trim();
+      const clipped = server.input.scrollWidth > server.input.clientWidth + 1;
+      if (!clipped || !value) {
+        fullAddress.removeClass("is-visible");
+        fullAddress.setText("");
+        return;
+      }
+      fullAddress.addClass("is-visible");
+      fullAddress.setText(t("settings.login.fullAddress", { url: value }));
+    };
+    server.input.addEventListener("input", syncFullAddress);
+    // The first paint happens before the field has a width; measure again once it has one.
+    window.setTimeout(syncFullAddress, 0);
+    // A window resize or a phone rotation changes the field's width too.
+    if (typeof ResizeObserver !== "undefined") {
+      this.loginResizeObserver = new ResizeObserver(syncFullAddress);
+      this.loginResizeObserver.observe(server.input);
+    }
+
+    const key = this.renderLoginField(form, "key", t("settings.login.userKey"), {
       type: "password",
       placeholder: "ck_...",
       value: this.plugin.settings.userKey ?? "",
+      icon: "key",
+      action: true,
       onChange: (value) => {
         this.plugin.settings.userKey = value.trim() || null;
         void this.plugin.saveSettings();
       },
     });
+    if (this.focusLoginKey) {
+      this.focusLoginKey = false;
+      window.setTimeout(() => key.input.focus?.(), 0);
+    }
 
-    const submit = card.createEl("button", {
+    // Reveal stays beside the dots: a pasted key is easy to get one character wrong, and
+    // the field is the one place that mistake can be seen before a round trip.
+    let keyVisible = false;
+    const reveal = key.control.createEl("button", { cls: "courier-login-reveal" });
+    reveal.type = "button";
+    const paintReveal = (): void => {
+      reveal.empty();
+      setIcon(reveal, keyVisible ? "eye-off" : "eye");
+      reveal.querySelector("svg")?.setAttribute("aria-hidden", "true");
+      const label = t(keyVisible ? "settings.login.hideKey" : "settings.login.showKey");
+      reveal.setAttribute("aria-label", label);
+      reveal.setAttribute("aria-pressed", String(keyVisible));
+      reveal.setAttribute("title", label);
+    };
+    paintReveal();
+    reveal.addEventListener("click", () => {
+      keyVisible = !keyVisible;
+      key.input.type = keyVisible ? "text" : "password";
+      paintReveal();
+      key.input.focus?.();
+    });
+
+    // The failure belongs to the form that produced it, so it sits between the fields and
+    // the button. It is part of this item rather than an item of its own: a second item
+    // would carry the same (empty) name, and the app keys an item by its name.
+    if (this.stageError) {
+      const error = form.createDiv({ cls: "courier-login-error" });
+      error.setAttribute("role", "alert");
+      error.setAttribute("id", "courier-login-error");
+      for (const input of [server.input, key.input]) {
+        input.setAttribute("aria-describedby", "courier-login-error");
+      }
+      const errorIcon = error.createSpan({ cls: "courier-login-error-icon" });
+      errorIcon.setAttribute("aria-hidden", "true");
+      setIcon(errorIcon, "alert-circle");
+      error.createSpan({ cls: "courier-login-error-text", text: this.stageError });
+    }
+
+    const submit = form.createEl("button", {
       text: t("settings.login.submit"),
       cls: "courier-login-submit",
     });
     submit.type = "button";
     submit.addClass("mod-cta");
-    submit.setCssStyles({ width: "100%", marginTop: "8px", padding: "10px" });
     const signIn = async () => {
+      // Enter reaches this from either field, so a second keypress while the request is in
+      // flight must not start a second sign-in.
+      if (submit.disabled) return;
       submit.disabled = true;
       submit.setText(t("settings.login.submitting"));
       await this.signIn();
     };
     submit.addEventListener("click", () => void signIn());
-    for (const input of [serverInput, keyInput]) {
+    for (const input of [server.input, key.input]) {
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") void signIn();
       });
-    }
-
-    // The failure lands under the button that produced it. It is part of this item rather than
-    // an item of its own: a second item would carry the same (empty) name, and the app keys an
-    // item by its name.
-    if (this.stageError) {
-      const error = card.createDiv({ cls: "courier-settings-error" });
-      error.setCssStyles({ color: "var(--text-error)", margin: "4px 0" });
-      error.setText(`⚠ ${this.stageError}`);
     }
   }
 
   /** One labelled, full-width field of the login form. */
   private renderLoginField(
     parent: HTMLElement,
+    name: "server" | "key",
     label: string,
     options: {
       type: string;
       placeholder: string;
       value: string;
+      icon: string;
+      /** Reserve room on the right for the field's own action button. */
+      action?: boolean;
       onChange: (value: string) => void;
     },
-  ): HTMLInputElement {
+  ): { field: HTMLElement; input: HTMLInputElement; control: HTMLElement } {
     const field = parent.createDiv({ cls: "courier-login-field" });
-    field.setCssStyles({ marginBottom: "14px" });
+    const inputId = `courier-login-${name}`;
     const labelEl = field.createEl("label", { text: label, cls: "courier-login-label" });
-    labelEl.setCssStyles({
-      display: "block",
-      marginBottom: "6px",
-      fontWeight: "600",
-      fontSize: "var(--font-ui-small)",
-    });
+    labelEl.htmlFor = inputId;
 
-    const input = field.createEl("input", { cls: "courier-login-input" });
+    const control = field.createDiv({
+      cls: options.action ? "courier-login-control has-action" : "courier-login-control",
+    });
+    const icon = control.createSpan({ cls: "courier-login-field-icon" });
+    icon.setAttribute("aria-hidden", "true");
+    setIcon(icon, options.icon);
+
+    const input = control.createEl("input", { cls: "courier-login-input" });
+    input.id = inputId;
     input.type = options.type;
     input.placeholder = options.placeholder;
     input.value = options.value;
-    input.setCssStyles({
-      boxSizing: "border-box",
-      width: "100%",
-      padding: "8px 10px",
-      border: "1px solid var(--background-modifier-border)",
-      borderRadius: "var(--radius-m)",
-      background: "var(--background-modifier-form-field)",
-      color: "var(--text-normal)",
-    });
+    input.autocomplete = "off";
+    input.spellcheck = false;
     input.addEventListener("input", () => options.onChange(input.value));
-    return input;
+    return { field, input, control };
   }
 
   /** Keep the credentials, prove the key works, and show the vault list. */
@@ -627,6 +834,8 @@ export class CourierSettingTab extends PluginSettingTab {
       // the vault"; the override keeps the page on the field the user has to fix.
       this.showLogin = true;
       this.stageError = outcome.error;
+      // The re-render replaces the form, so put the caret back where the fix belongs.
+      this.focusLoginKey = true;
       this.refresh();
       return;
     }
@@ -865,6 +1074,205 @@ export class CourierSettingTab extends PluginSettingTab {
       });
   }
 
+  /**
+   * One history-limit row: the value as **text**, a pencil icon beside it, and an
+   * explicit check-icon `Save` step.
+   *
+   * The value is vault-level state shared by every device, so the row is a view of what
+   * the server holds: it paints the cached number, asks once per render whether the server
+   * agrees (`plugin.refreshVaultHistoryLimits`), and a change goes through
+   * `plugin.setVaultHistoryLimit` only when the user presses the check — the confirmation
+   * is the feedback that it was stored. A value that is not a usable number is refused
+   * inline without a request; a failed save stays in the field with the server's message
+   * and the row keeps the number the server still holds. Pressing anywhere outside the row
+   * cancels the edit — only the check icon commits.
+   */
+  private buildHistoryLimitRow(setting: Setting, kind: keyof HistoryLimits): void {
+    const label = t(HISTORY_LIMIT_LABEL_KEYS[kind]);
+    const baseDescription = t(HISTORY_LIMIT_DESCRIPTION_KEYS[kind]);
+    setting.setName(label).setDesc(baseDescription).setClass("courier-history-limit-row");
+
+    // The number, next to the button; the input only exists while the row is being edited.
+    const valueEl = setting.controlEl.createSpan({ cls: "courier-history-limit-value" });
+    valueEl.setCssStyles({ minWidth: "3ch", textAlign: "right" });
+
+    let editing = false;
+    let saving = false;
+    let draft = this.storedLimitOf(kind);
+    let field: TextComponent | null = null;
+    let button: ButtonComponent | null = null;
+    /** Removes the edit-mode "pressed outside" listener, while one is registered. */
+    let dismissOutside: (() => void) | null = null;
+
+    /**
+     * Watch for a press anywhere but this row while it is being edited.
+     *
+     * The page has no other way to know the user moved on: pressing blank space (or another
+     * row) cancels the edit — it does not save, because the check icon is the only commit.
+     * Presses inside the row (the field, the check) belong to it. Registered on the
+     * document the row lives in, so the settings page works in a popout window too; a host
+     * without a DOM (the unit-test stub) simply gets no listener.
+     */
+    const listenOutside = (): void => {
+      if (dismissOutside !== null) return;
+      const doc =
+        setting.settingEl.ownerDocument ?? (typeof document === "undefined" ? null : document);
+      if (doc === null) return;
+      const onPointerDown = (event: PointerEvent): void => {
+        // A save in flight is not cancellable; it is also over in a moment.
+        if (!editing || saving) return;
+        const target = event.target as Node | null;
+        if (target !== null && setting.settingEl.contains(target)) return;
+        stopEditing();
+      };
+      const remove = (): void => {
+        doc.removeEventListener("pointerdown", onPointerDown, true);
+        this.historyLimitDismissers.delete(remove);
+        if (dismissOutside === remove) dismissOutside = null;
+      };
+      doc.addEventListener("pointerdown", onPointerDown, true);
+      dismissOutside = remove;
+      this.historyLimitDismissers.add(remove);
+    };
+
+    const stopListening = (): void => {
+      dismissOutside?.();
+      dismissOutside = null;
+    };
+
+    /** Paint the row for its current mode: text + pencil, or input + `Save`. */
+    const paint = (): void => {
+      const limits = this.plugin.vaultHistoryLimits;
+      valueEl.setText(limits === null ? t("settings.historyLimit.unknown") : String(limits[kind]));
+      if (editing) {
+        valueEl.hide();
+        valueEl.addClass("is-editing");
+        field?.inputEl.show();
+        field?.inputEl.addClass("is-editing");
+      } else {
+        valueEl.show();
+        valueEl.removeClass("is-editing");
+        field?.inputEl.hide();
+        field?.inputEl.removeClass("is-editing");
+      }
+      field?.setDisabled(saving);
+      button?.setDisabled(saving);
+      // The control is an icon in every mode: a pencil to open the field, a check to
+      // commit it. `clickable-icon` is what gives it the app's borderless icon chrome
+      // instead of a button's, and the tooltip carries the label a word would.
+      button?.buttonEl.addClass("clickable-icon");
+      if (saving) {
+        button?.setIcon("check");
+        button?.setTooltip(t("settings.historyLimit.saving"));
+        return;
+      }
+      if (editing) {
+        button?.setIcon("check");
+        button?.setTooltip(t("settings.historyLimit.confirm"));
+        return;
+      }
+      button?.setIcon("pencil");
+      button?.setTooltip(t("settings.historyLimit.edit"));
+    };
+
+    const startEditing = (): void => {
+      draft = this.storedLimitOf(kind);
+      field?.setValue(draft);
+      editing = true;
+      setting.setDesc(baseDescription);
+      paint();
+      field?.inputEl.focus?.();
+      listenOutside();
+    };
+
+    const stopEditing = (): void => {
+      stopListening();
+      editing = false;
+      draft = this.storedLimitOf(kind);
+      field?.setValue(draft);
+      setting.setDesc(baseDescription);
+      paint();
+    };
+
+    const save = async (): Promise<void> => {
+      if (saving) return;
+      const value = Number(draft);
+      if (!Number.isSafeInteger(value) || value < 1 || value > MAX_HISTORY_LIMIT) {
+        setting.setDesc(t("settings.historyLimit.invalid", { max: MAX_HISTORY_LIMIT }));
+        return;
+      }
+      saving = true;
+      paint();
+      const outcome = await this.plugin.setVaultHistoryLimit(kind, value);
+      saving = false;
+      if (!outcome.ok) {
+        // Stay in the field: the number the server still holds stays on screen, and the
+        // message sits where the user clicked.
+        setting.setDesc(outcome.error);
+        paint();
+        return;
+      }
+      // The check press is the confirmation: the row goes back to the number the server
+      // now holds, and no "saved" line is added — a success the user caused needs no toast.
+      stopEditing();
+    };
+
+    setting.addText((text) => {
+      field = text;
+      text.inputEl.type = "number";
+      text.inputEl.min = "1";
+      text.inputEl.addClass("courier-history-limit-input");
+      text.setValue(draft);
+      text.onChange((value) => {
+        draft = value;
+      });
+      text.inputEl.addEventListener("keydown", (event) => {
+        if (!editing) return;
+        if (event.key === "Enter") {
+          event.preventDefault?.();
+          void save();
+        } else if (event.key === "Escape") {
+          event.preventDefault?.();
+          stopEditing();
+        }
+      });
+    });
+    setting.addButton((component) => {
+      button = component;
+      component.onClick(() => {
+        if (editing) void save();
+        else startEditing();
+      });
+    });
+    paint();
+    // Registered for the live update: another device's change reaches `applyVaultLimits`,
+    // which repaints this row from the cache (and leaves an edit in progress alone).
+    this.historyLimitPaints.add(() => {
+      paint();
+      if (!editing) setting.setDesc(baseDescription);
+    });
+
+    // What the server holds right now — the same read both rows share (single-flight in
+    // the plugin). It lands after the row is painted; a row the user is editing is left
+    // alone, because the change they typed must not be overwritten by a read that started
+    // before it.
+    void this.plugin.refreshVaultHistoryLimits().then((limits) => {
+      if (limits === null) {
+        if (!editing) setting.setDesc(t("settings.historyLimit.unavailable"));
+        paint();
+        return;
+      }
+      if (!editing) setting.setDesc(baseDescription);
+      paint();
+    });
+  }
+
+  /** The cached server value for one limit, or "" while it has never been read. */
+  private storedLimitOf(kind: keyof HistoryLimits): string {
+    const limits = this.plugin.vaultHistoryLimits;
+    return limits === null ? "" : String(limits[kind]);
+  }
+
   /** The bound vault, its live state, and the way out of it. */
   private buildConnectionRow(setting: Setting): void {
     setting
@@ -1021,9 +1429,28 @@ export class CourierSettingTab extends PluginSettingTab {
 
   // ── Helpers ──
 
+  /**
+   * Put the app's own chrome back and stop watching the URL field.
+   *
+   * The login step is the only stage that removes the grouping panel's background and
+   * stretches its ancestors. The classes live on three different elements, so they are
+   * tracked and removed together; the observer is disconnected with them.
+   */
+  private clearLoginChrome(): void {
+    this.loginRowEl?.removeClass("courier-login-row");
+    this.loginGroupEl?.removeClass("courier-login-group");
+    this.loginPageEl?.removeClass("courier-login-page");
+    this.loginResizeObserver?.disconnect();
+    this.loginRowEl = null;
+    this.loginGroupEl = null;
+    this.loginPageEl = null;
+    this.loginResizeObserver = null;
+  }
+
   /** Drop the per-step state when the flow moves on (bind, unbind, log out). */
   private resetStages(): void {
     this.stageError = null;
     this.showLogin = false;
+    this.focusLoginKey = false;
   }
 }

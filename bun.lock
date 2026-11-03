@@ -27,9 +27,6 @@
       "name": "@courier/shared",
     },
   },
-  "overrides": {
-    "typescript": "^6.0.3",
-  },
   "packages": {
     "@codemirror/state": ["@codemirror/state@6.7.6", "", { "dependencies": { "@marijn/find-cluster-break": "^1.0.0" } }, "sha512-kAz+AncRtKuIknedxT1bq4XwXv4UowhbkHU1myPrtVb/jZtImWuV5BXzv5vK6i3kYACsdiZiQKFQQ5Mq7elW8w=="],
 
