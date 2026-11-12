@@ -13,6 +13,7 @@ export const API_ERROR_CODES = [
   "KEY_EXPIRED",
   "KEY_DISABLED",
   "INSUFFICIENT_SCOPE",
+  "CONTRACT_MISMATCH",
   "RATE_LIMITED",
   "QUOTA_EXCEEDED",
   "VAULT_LIMIT_REACHED",
@@ -31,4 +32,18 @@ export interface ApiError {
     field: string;
     message: string;
   }>;
+}
+
+/**
+ * The body of a `426 CONTRACT_MISMATCH`: the base error plus the two generation
+ * windows and the server's release version, so a caller that skipped `/api/health`
+ * can still tell which side has to move.
+ */
+export interface ContractMismatchErrorBody {
+  error: "CONTRACT_MISMATCH";
+  message: string;
+  serverContract: number;
+  minClient: number;
+  clientContract: number;
+  serverVersion: string;
 }
